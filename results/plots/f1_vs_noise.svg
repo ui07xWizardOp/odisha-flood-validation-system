@@ -1,0 +1,49 @@
+<svg width="800" height="400" xmlns="http://www.w3.org/2000/svg">
+<rect width="100%" height="100%" fill="white"/>
+<line x1="50" y1="350" x2="750" y2="350" stroke="black"/>
+<line x1="50" y1="50" x2="50" y2="350" stroke="black"/>
+<text x="150.0" y="370" text-anchor="middle">5%</text>
+<line x1="150.0" y1="350" x2="150.0" y2="355" stroke="black"/>
+<text x="350.0" y="370" text-anchor="middle">15%</text>
+<line x1="350.0" y1="350" x2="350.0" y2="355" stroke="black"/>
+<text x="650.0" y="370" text-anchor="middle">30%</text>
+<line x1="650.0" y1="350" x2="650.0" y2="355" stroke="black"/>
+<text x="400.0" y="390" text-anchor="middle" font-weight="bold">Noise Level</text>
+<text x="40" y="355.0" text-anchor="end">0.5</text>
+<line x1="45" y1="350.0" x2="50" y2="350.0" stroke="black"/>
+<line x1="50" y1="350.0" x2="750" y2="350.0" stroke="#ddd"/>
+<text x="40" y="295.0" text-anchor="end">0.6</text>
+<line x1="45" y1="290.0" x2="50" y2="290.0" stroke="black"/>
+<line x1="50" y1="290.0" x2="750" y2="290.0" stroke="#ddd"/>
+<text x="40" y="235.00000000000003" text-anchor="end">0.7</text>
+<line x1="45" y1="230.00000000000003" x2="50" y2="230.00000000000003" stroke="black"/>
+<line x1="50" y1="230.00000000000003" x2="750" y2="230.00000000000003" stroke="#ddd"/>
+<text x="40" y="174.99999999999997" text-anchor="end">0.8</text>
+<line x1="45" y1="169.99999999999997" x2="50" y2="169.99999999999997" stroke="black"/>
+<line x1="50" y1="169.99999999999997" x2="750" y2="169.99999999999997" stroke="#ddd"/>
+<text x="40" y="115.0" text-anchor="end">0.9</text>
+<line x1="45" y1="110.0" x2="50" y2="110.0" stroke="black"/>
+<line x1="50" y1="110.0" x2="750" y2="110.0" stroke="#ddd"/>
+<text x="40" y="55.0" text-anchor="end">1.0</text>
+<line x1="45" y1="50.0" x2="50" y2="50.0" stroke="black"/>
+<line x1="50" y1="50.0" x2="750" y2="50.0" stroke="#ddd"/>
+<polyline points="150.0,50.0 350.0,50.0 650.0,58.823529411764696 " fill="none" stroke="blue" stroke-width="3"/>
+<circle cx="150.0" cy="50.0" r="4" fill="blue"/>
+<circle cx="350.0" cy="50.0" r="4" fill="blue"/>
+<circle cx="650.0" cy="58.823529411764696" r="4" fill="blue"/>
+<polyline points="150.0,50.0 350.0,50.0 650.0,50.0 " fill="none" stroke="green" stroke-width="3"/>
+<circle cx="150.0" cy="50.0" r="4" fill="green"/>
+<circle cx="350.0" cy="50.0" r="4" fill="green"/>
+<circle cx="650.0" cy="50.0" r="4" fill="green"/>
+<polyline points="150.0,50.0 350.0,50.0 650.0,67.39130434782612 " fill="none" stroke="red" stroke-width="3"/>
+<circle cx="150.0" cy="50.0" r="4" fill="red"/>
+<circle cx="350.0" cy="50.0" r="4" fill="red"/>
+<circle cx="650.0" cy="67.39130434782612" r="4" fill="red"/>
+<rect x="650" y="50" width="100" height="80" fill="white" stroke="#ccc"/>
+<line x1="660" y1="70" x2="680" y2="70" stroke="blue" stroke-width="3"/>
+<text x="690" y="74" font-size="12">F1</text>
+<line x1="660" y1="90" x2="680" y2="90" stroke="green" stroke-width="3"/>
+<text x="690" y="94" font-size="12">Precision</text>
+<line x1="660" y1="110" x2="680" y2="110" stroke="red" stroke-width="3"/>
+<text x="690" y="114" font-size="12">Recall</text>
+</svg>
