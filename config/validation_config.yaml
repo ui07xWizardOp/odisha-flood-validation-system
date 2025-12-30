@@ -1,0 +1,57 @@
+# Validation Layer Weights
+validation:
+  threshold: 0.7
+  layer_weights:
+    physical: 0.4
+    statistical: 0.4
+    reputation: 0.2
+
+# Physical Layer (Layer 1) Parameters
+physical:
+  hand_threshold_high: 10.0 # meters - above this is very unlikely to flood
+  hand_threshold_suspicious: 5.0 # meters
+  slope_max: 30.0 # degrees - impossible for standing water
+  slope_steep: 15.0 # degrees
+  local_high_diff: 5.0 # meters above neighbors = suspicious
+
+# Statistical Layer (Layer 2) Parameters
+statistical:
+  spatial_radius_deg: 0.002 # ~220m at equator
+  min_cluster_neighbors: 3
+  outlier_z_threshold: 2.0
+
+# Reputation Layer (Layer 3) Parameters
+reputation:
+  initial_trust: 0.5
+  trust_increment: 0.1 # After verified report
+  trust_decrement: 0.15 # After flagged report
+  min_trust: 0.0
+  max_trust: 1.0
+
+# Study Area (Mahanadi Delta, Odisha)
+study_area:
+  name: "Mahanadi Delta"
+  min_lat: 19.5
+  max_lat: 21.5
+  min_lon: 84.5
+  max_lon: 87.0
+  reference_points:
+    cuttack: [20.4625, 85.8830]
+    puri: [19.8135, 85.8312]
+    bhubaneswar: [20.2961, 85.8245]
+
+# Data Paths (relative to project root)
+paths:
+  dem: "data/processed/mahanadi_dem_30m.tif"
+  hand: "data/processed/mahanadi_hand.tif"
+  slope: "data/processed/mahanadi_slope.tif"
+  synthetic_data: "data/synthetic"
+  results: "results"
+
+# API Settings
+api:
+  host: "0.0.0.0"
+  port: 8000
+  debug: true
+  cors_origins:
+    - "*"

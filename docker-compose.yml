@@ -1,0 +1,160 @@
+# =============================================================================
+# Odisha Flood Validation System - Docker Compose Configuration
+# =============================================================================
+# Production-ready Docker setup for API + PostGIS database
+#
+# Usage:
+#   1. Copy .env.example to .env and configure
+#   2. Run: docker-compose up -d
+#   3. Access API at: http://localhost:8000
+#   4. Access API docs at: http://localhost:8000/docs
+#
+# Services:
+#   - api: FastAPI application
+#   - db: PostgreSQL 15 with PostGIS 3.3
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL + PostGIS Database
+  # ---------------------------------------------------------------------------
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: flood_validation_db
+    restart: unless-stopped
+    
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-flood_validation}
+      POSTGRES_USER: ${POSTGRES_USER:-flood_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Database password required}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    
+    volumes:
+      # Persist database data
+      - postgres_data:/var/lib/postgresql/data
+      
+      # Mount init scripts (run on first start)
+      - ./scripts/setup_database.sql:/docker-entrypoint-initdb.d/01_setup.sql:ro
+    
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-flood_admin} -d ${POSTGRES_DB:-flood_validation}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    
+    networks:
+      - flood_network
+
+  # ---------------------------------------------------------------------------
+  # FastAPI Application
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: flood_validation_api
+    restart: unless-stopped
+    
+    environment:
+      # Database connection
+      DATABASE_URL: postgresql://${POSTGRES_USER:-flood_admin}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-flood_validation}
+      
+      # API settings
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      DEBUG: ${DEBUG:-false}
+      
+      # CORS origins (comma-separated)
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8080}
+      
+      # Raster data paths (mounted volumes)
+      DEM_PATH: /app/data/processed/mahanadi_dem_30m.tif
+      HAND_PATH: /app/data/processed/mahanadi_hand.tif
+      SLOPE_PATH: /app/data/processed/mahanadi_slope.tif
+      
+      # Optional: API keys
+      TWITTER_BEARER_TOKEN: ${TWITTER_BEARER_TOKEN:-}
+      MAPBOX_TOKEN: ${MAPBOX_TOKEN:-}
+    
+    volumes:
+      # Mount source code for development (hot reload)
+      - ./src:/app/src:ro
+      
+      # Mount data directory (read-only for API)
+      - ./data:/app/data:ro
+      
+      # Mount config
+      - ./config:/app/config:ro
+    
+    ports:
+      - "${API_PORT:-8000}:8000"
+    
+    depends_on:
+      db:
+        condition: service_healthy
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    networks:
+      - flood_network
+    
+    # Development: Enable auto-reload
+    command: ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  # ---------------------------------------------------------------------------
+  # Optional: PgAdmin for database management
+  # ---------------------------------------------------------------------------
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: flood_validation_pgadmin
+    restart: unless-stopped
+    profiles:
+      - tools  # Only start with: docker-compose --profile tools up
+    
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@floodvalidation.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    
+    depends_on:
+      - db
+    
+    networks:
+      - flood_network
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres_data:
+    driver: local
+    name: flood_validation_postgres
+  
+  pgadmin_data:
+    driver: local
+    name: flood_validation_pgadmin
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  flood_network:
+    driver: bridge
+    name: flood_validation_network
