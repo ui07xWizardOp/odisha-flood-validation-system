@@ -11,25 +11,25 @@
 # -----------------------------------------------------------------------------
 # Core Data Science Stack
 # -----------------------------------------------------------------------------
-pandas==2.1.0
-numpy==1.24.3
-scipy==1.11.1
+pandas
+numpy
+scipy
 
 # -----------------------------------------------------------------------------
 # Machine Learning
 # -----------------------------------------------------------------------------
-scikit-learn==1.3.0
+scikit-learn
 joblib==1.3.2
 
 # -----------------------------------------------------------------------------
 # Geospatial Processing
 # -----------------------------------------------------------------------------
 # Note: Install GDAL via conda first: conda install -c conda-forge gdal=3.7.1
-rasterio==1.3.8
-geopandas==0.13.2
-shapely==2.0.1
-fiona==1.9.4
-pyproj==3.6.0
+rasterio
+geopandas
+shapely
+fiona
+pyproj
 
 # For coordinate transformations
 geopy==2.4.0
@@ -47,10 +47,10 @@ geoalchemy2==0.14.1
 # -----------------------------------------------------------------------------
 # API Framework
 # -----------------------------------------------------------------------------
-fastapi==0.103.1
-uvicorn[standard]==0.23.2
-pydantic==2.3.0
-pydantic-settings==2.0.3
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
 python-multipart==0.0.6
 
 # CORS and security
@@ -61,7 +61,7 @@ python-jose[cryptography]==3.3.0
 # -----------------------------------------------------------------------------
 requests==2.31.0
 httpx==0.24.1
-aiohttp==3.8.5
+aiohttp
 
 # Twitter API
 tweepy==4.14.0
@@ -72,7 +72,7 @@ ratelimit==2.2.1
 # -----------------------------------------------------------------------------
 # Visualization
 # -----------------------------------------------------------------------------
-matplotlib==3.7.2
+matplotlib
 seaborn==0.12.2
 
 # Interactive notebooks

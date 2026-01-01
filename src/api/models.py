@@ -1,7 +1,17 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from geoalchemy2 import Geography
+import os
+
+# Conditional import for geoalchemy2 (only available with PostGIS)
+_db_url = os.getenv("DATABASE_URL", "")
+_use_postgis = _db_url and "YOUR_SECURE_PASSWORD_HERE" not in _db_url and "sqlite" not in _db_url.lower()
+
+if _use_postgis:
+    from geoalchemy2 import Geography
+else:
+    Geography = None  # SQLite fallback
+
 from src.api.database import Base
 
 class User(Base):
@@ -38,7 +48,11 @@ class FloodReport(Base):
     
     # Geospatial
     # SRID 4326 is WGS84 (Lat/Lon)
-    location = Column(Geography(geometry_type='POINT', srid=4326), nullable=False)
+    # Note: location column requires PostGIS. For SQLite, we store as WKT string.
+    if _use_postgis:
+        location = Column(Geography(geometry_type='POINT', srid=4326), nullable=True)
+    else:
+        location = Column(String(255), nullable=True)  # Store as WKT for SQLite
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
     location_accuracy_m = Column(Float)
@@ -97,5 +111,9 @@ class GroundTruth(Base):
     truth_id = Column(Integer, primary_key=True)
     event_name = Column(String(100), nullable=False)
     event_date = Column(DateTime(timezone=True))
-    flood_extent = Column(Geography(geometry_type='MULTIPOLYGON', srid=4326))
+    # Note: flood_extent requires PostGIS. For SQLite, store as WKT string.
+    if _use_postgis:
+        flood_extent = Column(Geography(geometry_type='MULTIPOLYGON', srid=4326))
+    else:
+        flood_extent = Column(Text, nullable=True)  # Store as WKT for SQLite
     created_at = Column(DateTime(timezone=True), server_default=func.now())

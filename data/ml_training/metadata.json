@@ -1,0 +1,6 @@
+{
+  "generated_at": "2025-12-31T01:16:23.344879",
+  "n_samples": 10000,
+  "train_test_split": 0.8,
+  "random_seed": 42
+}

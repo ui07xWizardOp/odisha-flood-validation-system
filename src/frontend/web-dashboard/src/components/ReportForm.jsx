@@ -37,7 +37,8 @@ const ReportForm = ({ onSubmit }) => {
                 user_id: parseInt(formData.user_id),
                 latitude: parseFloat(formData.latitude),
                 longitude: parseFloat(formData.longitude),
-                depth_meters: parseFloat(formData.depth_meters)
+                depth_meters: parseFloat(formData.depth_meters),
+                timestamp: new Date().toISOString()  // Add required timestamp
             });
             setResult(response);
         } catch (err) {

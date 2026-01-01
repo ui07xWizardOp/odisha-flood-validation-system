@@ -28,62 +28,57 @@ This repository contains the implementation of a novel three-layer validation fr
 
 ### Prerequisites
 
-- Python 3.10+
-- PostgreSQL 15+ with PostGIS
-- GDAL 3.7+ (install via conda)
-- Node.js 20+ (for frontend)
-- Docker (optional, for containerized setup)
+- **Python 3.10 or 3.11** (Avoid Python 3.13 due to wheel compatibility issues)
+- Node.js 18+ (for frontend)
+- Git
 
 ### Installation
 
-#### Option 1: Conda (Recommended)
+#### 1. Backend Setup
 
-```bash
-# Clone repository
-git clone https://github.com/your-org/odisha-flood-validation.git
-cd odisha-flood-validation
+```powershell
+# Create virtual environment (Python 3.11 recommended)
+py -3.11 -m venv .venv
+.venv\Scripts\Activate.ps1
 
-# Create conda environment
-conda env create -f environment.yml
-conda activate flood-validation
+# Install dependencies
+pip install -r requirements.txt
 
-# Setup database
-psql -U postgres -f scripts/setup_database.sql
-
-# Copy and configure environment
-cp .env.example .env
-# Edit .env with your settings
+# Configure environment (auto-enables SQLite fallback for local dev)
+Copy-Item .env.example .env
 ```
 
-#### Option 2: Docker
+#### 2. Start Backend Server
 
-```bash
-# Copy environment file
-cp .env.example .env
-# Edit .env with your settings
-
-# Start services
-docker-compose up -d
-
-# Access:
-# - API: http://localhost:8000
-# - API Docs: http://localhost:8000/docs
+```powershell
+python -m uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Running the Application
+- **Health Check:** http://localhost:8000/
+- **API Docs:** http://localhost:8000/docs
 
-```bash
-# Start API server (development)
-uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
+#### 3. Start Frontend Dashboard
 
-# Run tests
-pytest tests/ -v
-
-# Start web dashboard
+```powershell
 cd src/frontend/web-dashboard
 npm install
 npm start
 ```
+
+- **Dashboard:** http://localhost:3000
+
+---
+
+## 🛠️ Troubleshooting
+
+If you encounter startup issues:
+
+| Issue | Solution |
+|-------|----------|
+| `No module named uvicorn` | Run `pip install uvicorn[standard]` in your venv |
+| `NameError: 'Any' not defined` | Fixed in `schemas.py` (ensure `Any` is imported from `typing`) |
+| PostgreSQL Auth Failed | The system will fallback to SQLite automatically. No action needed. |
+| Python 3.13 Build Errors | Use Python 3.11 (`py -3.11 -m venv .venv`) to avoid compilation issues. |
 
 ---
 

@@ -1,0 +1,19 @@
+{
+  "confusion_matrix": [
+    [
+      799,
+      1
+    ],
+    [
+      2,
+      1198
+    ]
+  ],
+  "roc_auc": 0.9999979166666667,
+  "feature_importances": {
+    "physical_score": 193,
+    "consensus_score": 237,
+    "temporal_score": 77,
+    "reputation_score": 230
+  }
+}

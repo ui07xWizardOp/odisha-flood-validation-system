@@ -39,20 +39,39 @@ function App() {
 
     const handleSubmitReport = async (reportData) => {
         try {
-            // First ensure user exists
+            // First ensure user exists (create if needed)
             try {
-                await createUser({ username: `user_${reportData.user_id}` });
+                await createUser({
+                    username: `user_${reportData.user_id}`,
+                    email: `user${reportData.user_id}@floodreport.local`
+                });
             } catch (e) {
-                // User might already exist, ignore
+                // User might already exist (400 error), which is fine
+                console.log('User creation skipped (may already exist):', e.message);
             }
 
             const result = await submitReport(reportData);
+            // API returns flat structure: validation_status, final_score (not nested)
+            const status = result.validation_status || 'submitted';
+            const score = result.final_score || 0;
             showSnackbar(
-                `Report ${result.validation.status}! Score: ${(result.validation.final_score * 100).toFixed(1)}%`,
-                result.validation.status === 'validated' ? 'success' : 'warning'
+                `Report ${status}! Score: ${(score * 100).toFixed(1)}%`,
+                status === 'validated' ? 'success' : 'warning'
             );
             loadData(); // Refresh
-            return result;
+            // Return in format expected by ReportForm
+            return {
+                report_id: result.report_id,
+                validation: {
+                    status: status,
+                    final_score: score,
+                    layer_scores: {
+                        L1_physical: result.physical_score || 0,
+                        L2_statistical: result.statistical_score || 0,
+                        L3_reputation: result.reputation_score || 0
+                    }
+                }
+            };
         } catch (error) {
             showSnackbar('Failed to submit report', 'error');
             throw error;
@@ -125,7 +144,7 @@ function App() {
                 textAlign: 'center'
             }}>
                 <Typography variant="body2">
-                    🌊 AI/ML-Enhanced Crowdsourced Flood Validation System © 2025 | SIH 2025 Research Project
+                    🌊 AI/ML-Enhanced Crowdsourced Flood Validation System © 2026 | Odisha Disaster Management
                 </Typography>
             </Box>
 

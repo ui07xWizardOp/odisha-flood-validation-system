@@ -11,6 +11,9 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 import random
+from src.preprocessing.weather_service import weather_service
+from src.preprocessing.geospatial_service import geo_service
+from src.preprocessing.social_service import social_service
 
 app = FastAPI(
     title="Odisha Flood Validation API (Demo)",
@@ -146,13 +149,55 @@ def submit_flood_report(report: FloodReportCreate):
     
     user = users_db[report.user_id]
     
-    # Validate the report
-    validation = mock_validate_report(
-        report.latitude,
-        report.longitude,
-        report.depth_meters,
-        user["trust_score"]
-    )
+    # Fetch Real-Time Context (Zero-Cost APIs)
+    weather_ctx = weather_service.get_current_weather(report.latitude, report.longitude)
+    ground_truth = geo_service.check_ground_truth(report.latitude, report.longitude)
+    social_ctx = social_service.get_social_context("Odisha")
+    
+    # Extract Real Features
+    rainfall = weather_ctx['rainfall_mm'] if weather_ctx else 0.0
+    in_zone = ground_truth['in_flood_zone']
+    social_buzz = social_ctx['buzz_score']
+    
+    # Validate (Hybrid: Mock + Real Data)
+    # Start with base user trust
+    base_score = user["trust_score"] * 0.3
+    
+    # Add Geospatial Verification (High confidence source)
+    if in_zone:
+        base_score += 0.4
+    
+    # Add Weather Verification (Rainfall check)
+    if rainfall > 10.0:  # >10mm rain
+        base_score += 0.2
+        
+    # Add Social Verification (News/Buzz check)
+    if social_buzz > 0.3:
+        base_score += 0.1
+        
+    # Add Physical Plausibility (Mocked for now)
+    if 0.2 < report.depth_meters < 3.0:
+        base_score += 0.1
+
+    final_score = min(base_score, 1.0)
+    status = "validated" if final_score >= 0.7 else "flagged"
+    
+    validation = {
+        "final_score": round(final_score, 3),
+        "status": status,
+        "layer_scores": {
+            "L1_physical": 0.8 if in_zone else 0.2,
+            "L2_statistical": 0.9 if rainfall > 10 else 0.4,
+            "L3_reputation": round(user["trust_score"], 3),
+            "L4_social": round(social_buzz, 2)
+        },
+        "context": {
+            "rainfall_mm": rainfall,
+            "in_flood_zone": in_zone,
+            "zone_source": ground_truth.get('source'),
+            "social_headlines": social_ctx.get('recent_headlines', [])
+        }
+    }
     
     report_id = report_counter
     report_counter += 1
@@ -168,7 +213,8 @@ def submit_flood_report(report: FloodReportCreate):
         "description": report.description,
         "validation_status": validation["status"],
         "final_score": validation["final_score"],
-        **validation["layer_scores"]
+        **validation["layer_scores"],
+        "context": validation["context"]
     }
     
     # Update user stats
@@ -180,7 +226,7 @@ def submit_flood_report(report: FloodReportCreate):
     return {
         "report_id": report_id,
         "validation": validation,
-        "message": f"Report {validation['status']} with score {validation['final_score']}"
+        "message": f"Report {validation['status']} (Rain: {rainfall}mm, Social: {social_buzz})"
     }
 
 @app.get("/reports")

@@ -132,6 +132,14 @@ const FloodMap = ({ reports }) => {
                                             L2: {(report.L2_statistical * 100).toFixed(0)}% |
                                             L3: {(report.L3_reputation * 100).toFixed(0)}%
                                         </Typography>
+                                        <Box sx={{ mt: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+                                            <Typography variant="caption" sx={{ color: '#1976d2', fontWeight: 'bold' }}>
+                                                🌧️ Rain: {report.context?.rainfall_mm || 0}mm
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ color: '#ed6c02', fontWeight: 'bold' }}>
+                                                🏞️ Zone: {report.context?.in_flood_zone ? 'Yes' : 'No'}
+                                            </Typography>
+                                        </Box>
                                     </Box>
                                 </Box>
                             </Popup>

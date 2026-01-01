@@ -6,8 +6,11 @@ from datetime import datetime
 import json
 
 from src.api import models, schemas
-from src.api.database import get_db, engine
+from src.api.database import get_db, engine, DATABASE_URL
 from src.validation.validator import FloodReportValidator
+
+# Check if we are using PostGIS
+_use_postgis = "sqlite" not in DATABASE_URL.lower()
 
 # Initialize Validator Orchestrator
 # (This loads large rasters, so done once at startup)
@@ -22,6 +25,24 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Startup Event: Seed Default User
+@app.on_event("startup")
+def seed_default_user():
+    db = next(get_db())
+    try:
+        default_user = db.query(models.User).filter(models.User.user_id == 1).first()
+        if not default_user:
+            print("[INFO] Seeding default guest user (ID: 1)...")
+            guest = models.User(
+                username="guest_user",
+                email="guest@floodvalidation.local",
+                trust_score=0.5
+            )
+            db.add(guest)
+            db.commit()
+    except Exception as e:
+        print(f"[WARN] User seeding failed (normal if DB not init): {e}")
+
 # CORS Security
 app.add_middleware(
     CORSMiddleware,
@@ -34,6 +55,27 @@ app.add_middleware(
 @app.get("/")
 def health_check():
     return {"status": "ok", "service": "flood-validation-api"}
+
+@app.get("/health")
+def health_check_alias():
+    return {"status": "ok", "service": "flood-validation-api"}
+
+@app.get("/stats")
+def get_system_stats(db: Session = Depends(get_db)):
+    """
+    Return basic system statistics for the dashboard.
+    """
+    total_users = db.query(models.User).count()
+    total_reports = db.query(models.FloodReport).count()
+    validated_reports = db.query(models.FloodReport).filter(models.FloodReport.validation_status == 'validated').count()
+    
+    return {
+        "total_reports": total_reports,
+        "validated_reports": validated_reports,
+        "active_users": total_users,
+        "system_status": "Operational",
+        "last_updated": datetime.now()
+    }
 
 # ==========================================
 # User Endpoints
@@ -93,25 +135,37 @@ def submit_report(report: schemas.FloodReportCreate, db: Session = Depends(get_d
     else:
         recent_df = pd.DataFrame()
 
-    # 3. Run Validation Logic
+    # 3. Run Validation Logic (ML-Enhanced 5-Layer)
     validation_result = validator_service.validate_report(
-        report_id=0, # Placeholder
+        report_id=0,  # Placeholder
         user_id=report.user_id,
         lat=report.latitude,
         lon=report.longitude,
         depth=report.depth_meters,
         timestamp=report.timestamp,
         recent_reports=recent_df,
-        rainfall_24h=0.0 # TODO: Connect to live rainfall API
+        rainfall_24h=None  # Will be fetched by validator
     )
     
     # 4. Save to Database
-    # Use ST_SetSRID(ST_MakePoint(lon, lat), 4326) for PostGIS
     from sqlalchemy import func
+    
+    # Build location value based on database type
+    if _use_postgis:
+        location_value = func.ST_SetSRID(func.ST_MakePoint(report.longitude, report.latitude), 4326)
+    else:
+        # For SQLite, store as WKT string
+        location_value = f"POINT({report.longitude} {report.latitude})"
+    
+    # Extract scores from new 5-layer structure
+    details = validation_result.get('details', {})
+    physical_score = details.get('physical', {}).get('layer1_score', 0.5)
+    statistical_score = details.get('statistical', {}).get('layer2_score', 0.5)
+    reputation_score = details.get('reputation', {}).get('layer3_score', 0.5)
     
     db_report = models.FloodReport(
         user_id=report.user_id,
-        location=func.ST_SetSRID(func.ST_MakePoint(report.longitude, report.latitude), 4326),
+        location=location_value,
         latitude=report.latitude,
         longitude=report.longitude,
         depth_meters=report.depth_meters,
@@ -122,9 +176,9 @@ def submit_report(report: schemas.FloodReportCreate, db: Session = Depends(get_d
         validation_status=validation_result['status'],
         final_score=validation_result['final_score'],
         
-        physical_score=validation_result['details']['physical']['layer1_score'],
-        statistical_score=validation_result['details']['statistical']['layer2_score'],
-        reputation_score=validation_result['details']['reputation']['layer3_score'],
+        physical_score=physical_score,
+        statistical_score=statistical_score,
+        reputation_score=reputation_score,
         
         validated_at=datetime.now()
     )
@@ -133,9 +187,7 @@ def submit_report(report: schemas.FloodReportCreate, db: Session = Depends(get_d
     db.commit()
     db.refresh(db_report)
     
-    # 5. Save Metadata
-    # (Simplified for brevity, full impl would unpack validation_result['details'])
-    
+    # 5. Return with full validation details
     return db_report
 
 @app.get("/reports", response_model=List[schemas.FloodReportResponse])
@@ -146,15 +198,75 @@ def get_reports(skip: int = 0, limit: int = 50, db: Session = Depends(get_db)):
 @app.get("/reports/nearby", response_model=List[schemas.FloodReportResponse])
 def get_nearby_reports(lat: float, lon: float, radius_m: int = 1000, db: Session = Depends(get_db)):
     """
-    Get reports within X meters of a point using PostGIS.
+    Get reports within X meters of a point.
+    Uses PostGIS if available, otherwise falls back to simple bounding box.
     """
-    # ST_DWithin(geography_column, point, distance_meters)
-    # Point is ST_SetSRID(ST_MakePoint(lon, lat), 4326)
+    from sqlalchemy import func
     
-    point = func.ST_SetSRID(func.ST_MakePoint(lon, lat), 4326)
-    
-    reports = db.query(models.FloodReport).filter(
-        func.ST_DWithin(models.FloodReport.location, point, radius_m)
-    ).all()
+    if _use_postgis:
+        # PostGIS spatial query
+        point = func.ST_SetSRID(func.ST_MakePoint(lon, lat), 4326)
+        reports = db.query(models.FloodReport).filter(
+            func.ST_DWithin(models.FloodReport.location, point, radius_m)
+        ).all()
+    else:
+        # SQLite fallback: simple bounding box approximation
+        # 1 degree latitude ~ 111km, 1 degree longitude varies
+        lat_delta = radius_m / 111000.0  # Rough approximation
+        lon_delta = radius_m / (111000.0 * abs(max(0.01, abs(lat))))  # Adjust for latitude
+        
+        reports = db.query(models.FloodReport).filter(
+            models.FloodReport.latitude.between(lat - lat_delta, lat + lat_delta),
+            models.FloodReport.longitude.between(lon - lon_delta, lon + lon_delta)
+        ).all()
     
     return reports
+
+# ==========================================
+# Photo Validation Endpoint (Computer Vision)
+# ==========================================
+
+from fastapi import File, UploadFile
+from src.ml.models.image_classifier import flood_classifier
+
+class PhotoValidationResponse(schemas.BaseModel):
+    valid: bool
+    is_flood_detected: bool
+    confidence: float
+    water_coverage: float
+    model_used: str
+    validation_score: float
+
+@app.post("/validate-photo", response_model=PhotoValidationResponse)
+async def validate_flood_photo(file: UploadFile = File(...)):
+    """
+    Validate a user-submitted flood photo using Computer Vision.
+    
+    Returns:
+        - is_flood_detected: Whether the image shows flooding
+        - confidence: Model confidence (0-1)
+        - water_coverage: Estimated water ratio in image
+        - validation_score: Overall score for validation boost
+    """
+    # Read image bytes
+    contents = await file.read()
+    
+    # Validate file type
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=400,
+            detail="File must be an image (JPEG, PNG)"
+        )
+    
+    # Run CV validation
+    result = flood_classifier.validate_image(contents)
+    
+    return PhotoValidationResponse(
+        valid=result.get("valid", False),
+        is_flood_detected=result.get("is_flood_detected", False),
+        confidence=result.get("confidence", 0.0),
+        water_coverage=result.get("water_coverage", 0.0),
+        model_used=result.get("model_used", "Unknown"),
+        validation_score=result.get("score", 0.0)
+    )
+
