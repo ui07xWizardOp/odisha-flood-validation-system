@@ -8,6 +8,7 @@ import StatsDashboard from './components/StatsDashboard';
 import FloodMap from './components/FloodMap';
 import ReportForm from './components/ReportForm';
 import ReportsTable from './components/ReportsTable';
+import ImageUploadForm from './components/ImageUploadForm';
 import { getStats, getReports, submitReport, createUser } from './api';
 
 function App() {
@@ -124,6 +125,7 @@ function App() {
                     <Tab label="📊 Dashboard" />
                     <Tab label="🗺️ Flood Map" />
                     <Tab label="📝 Submit Report" />
+                    <Tab label="📸 Photo Upload" />
                     <Tab label="📋 All Reports" />
                 </Tabs>
             </AppBar>
@@ -133,7 +135,8 @@ function App() {
                 {tabValue === 0 && <StatsDashboard stats={stats} reports={reports} />}
                 {tabValue === 1 && <FloodMap reports={reports} />}
                 {tabValue === 2 && <ReportForm onSubmit={handleSubmitReport} />}
-                {tabValue === 3 && <ReportsTable reports={reports} onRefresh={loadData} />}
+                {tabValue === 3 && <ImageUploadForm onSubmitImage={loadData} />}
+                {tabValue === 4 && <ReportsTable reports={reports} onRefresh={loadData} />}
             </Container>
 
             {/* Footer */}

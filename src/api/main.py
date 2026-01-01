@@ -270,3 +270,139 @@ async def validate_flood_photo(file: UploadFile = File(...)):
         validation_score=result.get("score", 0.0)
     )
 
+
+# ==========================================
+# One-Shot Image Report Endpoint
+# ==========================================
+
+from src.preprocessing.exif_service import exif_service
+
+class ImageReportResponse(schemas.BaseModel):
+    report_id: int
+    extracted_location: dict
+    cv_result: dict
+    validation_status: str
+    final_score: float
+    message: str
+
+@app.post("/reports/from-image", response_model=ImageReportResponse)
+async def submit_report_from_image(
+    file: UploadFile = File(...),
+    user_id: int = 1,
+    depth_meters: float = 1.0,
+    description: str = "",
+    db: Session = Depends(get_db)
+):
+    """
+    One-shot flood report submission from a geotagged image.
+    
+    Extracts GPS coordinates from EXIF, validates with CV, and creates report.
+    
+    Args:
+        file: Geotagged image (JPEG with GPS EXIF)
+        user_id: Reporter ID
+        depth_meters: Observed flood depth (optional, default 1.0m)
+        description: Optional description
+    
+    Returns:
+        Complete report with extracted location and validation results
+    """
+    # Validate file type
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image (JPEG, PNG)")
+    
+    # Verify user exists
+    user = db.query(models.User).filter(models.User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Read image bytes
+    contents = await file.read()
+    
+    # Extract GPS from EXIF
+    geotag = exif_service.extract_geotag(contents)
+    
+    if not geotag["success"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Could not extract GPS from image: {geotag['error']}"
+        )
+    
+    lat = geotag["latitude"]
+    lon = geotag["longitude"]
+    timestamp = geotag["timestamp"] or datetime.now().isoformat()
+    
+    # Run CV validation
+    cv_result = flood_classifier.validate_image(contents)
+    
+    # Run full validation pipeline
+    import pandas as pd
+    recent_reports = db.query(models.FloodReport).order_by(
+        models.FloodReport.timestamp.desc()
+    ).limit(100).all()
+    
+    recent_df = pd.DataFrame([{
+        'lat': r.latitude, 'lon': r.longitude,
+        'depth': r.depth_meters, 'timestamp': r.timestamp
+    } for r in recent_reports]) if recent_reports else pd.DataFrame()
+    
+    validation_result = validator_service.validate_report(
+        report_id=0,
+        user_id=user_id,
+        lat=lat,
+        lon=lon,
+        depth=depth_meters,
+        timestamp=datetime.fromisoformat(timestamp.replace('Z', '+00:00')) if isinstance(timestamp, str) else timestamp,
+        recent_reports=recent_df,
+        rainfall_24h=None,
+        image_bytes=contents  # Pass image for L5 validation
+    )
+    
+    # Save to database
+    from sqlalchemy import func
+    
+    if _use_postgis:
+        location_value = func.ST_SetSRID(func.ST_MakePoint(lon, lat), 4326)
+    else:
+        location_value = f"POINT({lon} {lat})"
+    
+    details = validation_result.get('details', {})
+    
+    db_report = models.FloodReport(
+        user_id=user_id,
+        location=location_value,
+        latitude=lat,
+        longitude=lon,
+        depth_meters=depth_meters,
+        timestamp=datetime.fromisoformat(timestamp.replace('Z', '+00:00')) if isinstance(timestamp, str) else datetime.now(),
+        description=description or f"Photo report from {geotag.get('device_model', 'Unknown')}",
+        validation_status=validation_result['status'],
+        final_score=validation_result['final_score'],
+        physical_score=details.get('physical', {}).get('layer1_score', 0.5),
+        statistical_score=details.get('statistical', {}).get('layer2_score', 0.5),
+        reputation_score=details.get('reputation', {}).get('layer3_score', 0.5),
+        validated_at=datetime.now()
+    )
+    
+    db.add(db_report)
+    db.commit()
+    db.refresh(db_report)
+    
+    return ImageReportResponse(
+        report_id=db_report.report_id,
+        extracted_location={
+            "latitude": lat,
+            "longitude": lon,
+            "altitude": geotag.get("altitude"),
+            "in_odisha_bounds": geotag.get("in_odisha_bounds", False),
+            "device": geotag.get("device_model")
+        },
+        cv_result={
+            "is_flood": cv_result.get("is_flood_detected", False),
+            "confidence": cv_result.get("confidence", 0.0),
+            "water_coverage": cv_result.get("water_coverage", 0.0)
+        },
+        validation_status=validation_result['status'],
+        final_score=validation_result['final_score'],
+        message=f"Report created from geotagged image at ({lat:.4f}, {lon:.4f})"
+    )
