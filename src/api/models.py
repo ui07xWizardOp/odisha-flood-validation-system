@@ -20,6 +20,7 @@ class User(Base):
     user_id = Column(Integer, primary_key=True, index=True)
     username = Column(String(100), unique=True, index=True, nullable=False)
     email = Column(String(255))
+    password_hash = Column(String(255), nullable=True)  # For JWT auth
     phone_hash = Column(String(64))
     
     # Trust System

@@ -39,6 +39,13 @@ journey
         See report on map: 5: App
         Trust score updated: 4: System, Database
         Share on social media: 3: Citizen
+
+    section Admin Monitoring
+        Log into Dashboard: 4: Admin
+        View All Reports Table: 5: Admin, AllReports.jsx
+        Filter by "Flagged": 4: Admin
+        Review photo & details: 5: Admin
+        Override Status (Validate/Reject): 5: Admin, API
 ```
 
 ## Alternative: Detailed User Flow

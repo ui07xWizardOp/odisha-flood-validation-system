@@ -28,6 +28,7 @@ from src.validation.layer3_reputation import ReputationSystem
 from src.preprocessing.weather_service import weather_service
 from src.preprocessing.geospatial_service import geo_service
 from src.preprocessing.social_service import social_service
+from src.preprocessing.hazard_zones import flood_hazard_zone
 
 # ML Models
 from src.ml.models.dbscan_clustering import spatial_analyzer
@@ -132,6 +133,17 @@ class FloodReportValidator:
         if ground_truth.get('in_flood_zone'):
             l1_score = min(l1_score + 0.2, 1.0)
             l1_result['zone_boost'] = True
+        
+        # Additional boost from NRSC Flood Hazard Atlas data
+        hazard_adjustment = flood_hazard_zone.get_hazard_score_adjustment(lat, lon)
+        if hazard_adjustment != 0:
+            l1_score = min(max(l1_score + hazard_adjustment, 0.0), 1.0)
+            hazard_level, district = flood_hazard_zone.get_hazard_level(lat, lon)
+            l1_result['nrsc_hazard_zone'] = {
+                'district': district,
+                'hazard_level': hazard_level.name if hazard_level else 'unknown',
+                'adjustment': hazard_adjustment
+            }
         
         # ==========================================
         # Layer 2: Statistical Consistency (DBSCAN)

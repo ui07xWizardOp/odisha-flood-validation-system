@@ -121,6 +121,38 @@ sequenceDiagram
     App-->>User: Show Validation Result
 ```
 
+## Admin Fetch Reports Workflow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    
+    actor Admin
+    participant Dash as 🖥️ Dashboard
+    participant API as ⚡ FastAPI
+    participant DB as 🐘 PostGIS
+
+    Admin->>Dash: Open "All Reports" Page
+    activate Dash
+    Dash->>Dash: Show Loading Spinner
+    
+    Dash->>API: GET /api/reports
+    activate API
+    Note right of Dash: triggered by useEffect()
+    
+    API->>DB: SELECT * FROM flood_reports
+    activate DB
+    DB-->>API: List[FloodReport]
+    deactivate DB
+    
+    API-->>Dash: 200 OK (JSON List)
+    deactivate API
+    
+    Dash->>Dash: Render Table Rows
+    Dash-->>Admin: Display Reports List
+    deactivate Dash
+```
+
 ## API Endpoint Details
 
 ### `POST /api/validate-photo`

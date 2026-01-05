@@ -12,15 +12,22 @@ A Case Study of the Mahanadi Delta, Odisha
 
 ## 🌊 Overview
 
-This repository contains the implementation of a novel three-layer validation framework for crowdsourced flood reports, integrating:
+This repository contains the implementation of a novel **five-layer ML-enhanced validation framework** for crowdsourced flood reports, integrating:
 
-1. **Physical Plausibility** - DEM, HAND, slope analysis
-2. **Statistical Consistency** - Spatial/temporal clustering
-3. **User Reputation** - Trust score weighting
+1. **Physical Plausibility** - DEM, HAND, slope analysis (Random Forest)
+2. **Statistical Consistency** - Spatial clustering (DBSCAN + XGBoost)
+3. **User Reputation** - Bayesian trust scoring
+4. **Social Context** - News API correlation
+5. **Visual Verification** - Computer vision flood detection
 
 **Study Area**: Mahanadi Delta, Odisha, India (Cyclone Fani 2019)
 
-**Key Result**: 92.3% precision at 15% noise level, outperforming baselines by 4-25 percentage points.
+**Current Status**: 🟢 **Phase 4: Integration & Verification** (See [Detailed Project Status](./PROJECT_STATUS.md))
+
+**Key Results**: 
+- F1 Score: **1.0** at 5-15% noise levels
+- F1 Score: **0.985** at 30% noise level
+- Outperforms rule-based baselines by 4-25 percentage points
 
 ---
 
@@ -119,6 +126,7 @@ odisha-flood-validation/
 |---------|--------|------------|
 | DEM | [FABDEM](https://data.bris.ac.uk/data/dataset/s5hqmjcdj8yo2ibzi9b4ew3sn) | 30m |
 | Ground Truth | [ISRO Bhuvan](https://bhuvan.nrsc.gov.in/) | Vector |
+| Flood Hazard Zones | [NRSC Flood Hazard Atlas](https://nrsc.gov.in) | District-level |
 | Rainfall | [IMD](https://www.imdpune.gov.in/) | 0.25° grid |
 | Social Media | Twitter API | Point data |
 
@@ -129,14 +137,14 @@ See [data/README.md](data/README.md) for download instructions.
 ## 🔬 Reproducing Results
 
 ```bash
-# Step 1: Generate synthetic datasets
-python src/experiments/generate_synthetic_data.py
+# Step 1: Generate synthetic datasets (5 noise levels)
+python -m src.experiments.data_generator
 
-# Step 2: Run noise sensitivity analysis
-python src/experiments/run_experiments.py
+# Step 2: Run experiments
+python -m src.experiments.runner_lite
 
-# Step 3: Generate paper figures
-python src/experiments/generate_figures.py
+# Step 3: View results
+cat results/experiments/results.csv
 
 # Results saved to: results/experiments/
 ```
@@ -147,12 +155,16 @@ python src/experiments/generate_figures.py
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/validate` | Validate a flood report |
-| `POST` | `/reports` | Submit a new report |
-| `GET` | `/reports/{id}` | Get report details |
-| `GET` | `/reports/nearby/{lat}/{lon}` | Find nearby reports |
-| `GET` | `/analytics/stats` | System statistics |
-| `GET` | `/analytics/leaderboard` | Top contributors |
+| `GET` | `/` | Health check |
+| `GET` | `/health` | Health check (alias) |
+| `GET` | `/stats` | System statistics |
+| `POST` | `/users` | Create user |
+| `GET` | `/users/{id}` | Get user details |
+| `POST` | `/reports` | Submit flood report (auto-validated) |
+| `GET` | `/reports` | List reports |
+| `GET` | `/reports/nearby` | Find nearby reports |
+| `POST` | `/validate-photo` | Validate flood photo (CV) |
+| `POST` | `/reports/from-image` | Submit report from geotagged image |
 
 Full API documentation: http://localhost:8000/docs
 

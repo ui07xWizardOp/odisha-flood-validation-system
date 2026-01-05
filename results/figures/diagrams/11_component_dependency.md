@@ -63,6 +63,20 @@ flowchart TD
         WEIGHT_JSON["weight_network.json"]
     end
 
+    subgraph Frontend["🖥️ src/frontend/"]
+        APP["App.js<br/>(Router)"]
+        ALL_REPORTS["AllReports.jsx<br/>(ListView)"]
+        DASHBOARD["Dashboard.jsx<br/>(MapView)"]
+        API_JS["api.js<br/>(Axios Client)"]
+    end
+
+    %% Frontend Dependencies
+    APP --> ALL_REPORTS
+    APP --> DASHBOARD
+    ALL_REPORTS --> API_JS
+    DASHBOARD --> API_JS
+    API_JS -.-> MAIN
+
     %% API Dependencies
     MAIN --> MODELS
     MAIN --> SCHEMAS

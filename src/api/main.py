@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
@@ -7,6 +8,12 @@ import json
 
 from src.api import models, schemas
 from src.api.database import get_db, engine, DATABASE_URL
+from src.api.auth import (
+    get_password_hash, verify_password, create_access_token, create_refresh_token,
+    decode_refresh_token, get_current_user, get_current_user_optional, 
+    Token, TokenData, is_auth_available, ACCESS_TOKEN_EXPIRE_MINUTES
+)
+from src.api.exports import router as exports_router
 from src.validation.validator import FloodReportValidator
 
 # Check if we are using PostGIS
@@ -58,7 +65,116 @@ def health_check():
 
 @app.get("/health")
 def health_check_alias():
-    return {"status": "ok", "service": "flood-validation-api"}
+    return {"status": "ok", "service": "flood-validation-api", "auth_enabled": is_auth_available()}
+
+# ==========================================
+# Authentication Endpoints
+# ==========================================
+
+@app.post("/auth/register", response_model=schemas.UserResponse, status_code=201)
+def register_user(username: str, password: str, email: Optional[str] = None, db: Session = Depends(get_db)):
+    """
+    Register a new user with username and password.
+    """
+    # Check if username exists
+    existing_user = db.query(models.User).filter(models.User.username == username).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    
+    # Create new user with hashed password
+    new_user = models.User(
+        username=username,
+        email=email,
+        password_hash=get_password_hash(password),
+        trust_score=0.5
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
+
+@app.post("/auth/login", response_model=Token)
+def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    """
+    Login with username and password, returns JWT access token.
+    """
+    # Find user
+    user = db.query(models.User).filter(models.User.username == form_data.username).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Verify password (check if user has password_hash)
+    stored_hash = getattr(user, 'password_hash', None)
+    if stored_hash and not verify_password(form_data.password, stored_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Create access token
+    access_token = create_access_token(
+        data={"sub": user.user_id, "username": user.username}
+    )
+    
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer",
+        "refresh_token": create_refresh_token(data={"sub": user.user_id, "username": user.username}),
+        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    }
+
+
+@app.get("/auth/me")
+def get_current_user_info(current_user: TokenData = Depends(get_current_user)):
+    """
+    Get information about the currently authenticated user.
+    """
+    return {
+        "user_id": current_user.user_id,
+        "username": current_user.username
+    }
+
+
+@app.post("/auth/refresh", response_model=Token)
+def refresh_access_token(refresh_token: str, db: Session = Depends(get_db)):
+    """
+    Exchange a refresh token for a new access token.
+    """
+    token_data = decode_refresh_token(refresh_token)
+    
+    if token_data is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Generate new tokens
+    access_token = create_access_token(
+        data={"sub": token_data.user_id, "username": token_data.username}
+    )
+    new_refresh_token = create_refresh_token(
+        data={"sub": token_data.user_id, "username": token_data.username}
+    )
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "refresh_token": new_refresh_token,
+        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    }
+
+
+# Include export routes
+app.include_router(exports_router)
+
 
 @app.get("/stats")
 def get_system_stats(db: Session = Depends(get_db)):
@@ -68,11 +184,18 @@ def get_system_stats(db: Session = Depends(get_db)):
     total_users = db.query(models.User).count()
     total_reports = db.query(models.FloodReport).count()
     validated_reports = db.query(models.FloodReport).filter(models.FloodReport.validation_status == 'validated').count()
+    flagged_reports = db.query(models.FloodReport).filter(models.FloodReport.validation_status != 'validated').count()
+    
+    # Calculate average score
+    from sqlalchemy import func
+    avg_score = db.query(func.avg(models.FloodReport.final_score)).scalar() or 0.0
     
     return {
         "total_reports": total_reports,
         "validated_reports": validated_reports,
-        "active_users": total_users,
+        "flagged_reports": flagged_reports,
+        "total_users": total_users,
+        "average_score": float(avg_score),
         "system_status": "Operational",
         "last_updated": datetime.now()
     }
@@ -322,74 +445,90 @@ async def submit_report_from_image(
     # Extract GPS from EXIF
     geotag = exif_service.extract_geotag(contents)
     
+    # === FALLBACK FOR DEMO / TESTING ===
+    # If no GPS found, use None (User requested N/A)
     if not geotag["success"]:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Could not extract GPS from image: {geotag['error']}"
-        )
+        print("[WARN] No GPS found in image. Skipping Location & DB Save.")
+        lat = None
+        lon = None
+        timestamp = datetime.now()
+        description = description + " [No GPS Data]"
+    else:
+        lat = geotag["latitude"]
+        lon = geotag["longitude"]
+        timestamp = geotag["timestamp"]
     
-    lat = geotag["latitude"]
-    lon = geotag["longitude"]
-    timestamp = geotag["timestamp"] or datetime.now().isoformat()
+    if not timestamp:
+         timestamp = datetime.now().isoformat()
     
     # Run CV validation
     cv_result = flood_classifier.validate_image(contents)
     
-    # Run full validation pipeline
-    import pandas as pd
-    recent_reports = db.query(models.FloodReport).order_by(
-        models.FloodReport.timestamp.desc()
-    ).limit(100).all()
+    # Run full validation pipeline ONLY if location exists
+    validation_status = "flagged"
+    final_score = 0.0
+    db_report = None
     
-    recent_df = pd.DataFrame([{
-        'lat': r.latitude, 'lon': r.longitude,
-        'depth': r.depth_meters, 'timestamp': r.timestamp
-    } for r in recent_reports]) if recent_reports else pd.DataFrame()
-    
-    validation_result = validator_service.validate_report(
-        report_id=0,
-        user_id=user_id,
-        lat=lat,
-        lon=lon,
-        depth=depth_meters,
-        timestamp=datetime.fromisoformat(timestamp.replace('Z', '+00:00')) if isinstance(timestamp, str) else timestamp,
-        recent_reports=recent_df,
-        rainfall_24h=None,
-        image_bytes=contents  # Pass image for L5 validation
-    )
-    
-    # Save to database
-    from sqlalchemy import func
-    
-    if _use_postgis:
-        location_value = func.ST_SetSRID(func.ST_MakePoint(lon, lat), 4326)
+    if lat is not None and lon is not None:
+        import pandas as pd
+        recent_reports = db.query(models.FloodReport).order_by(
+            models.FloodReport.timestamp.desc()
+        ).limit(100).all()
+        
+        recent_df = pd.DataFrame([{
+            'lat': r.latitude, 'lon': r.longitude,
+            'depth': r.depth_meters, 'timestamp': r.timestamp
+        } for r in recent_reports]) if recent_reports else pd.DataFrame()
+        
+        validation_result = validator_service.validate_report(
+            report_id=0,
+            user_id=user_id,
+            lat=lat,
+            lon=lon,
+            depth=depth_meters,
+            timestamp=datetime.fromisoformat(timestamp.replace('Z', '+00:00')) if isinstance(timestamp, str) else timestamp,
+            recent_reports=recent_df,
+            rainfall_24h=None,
+            image_bytes=contents 
+        )
+        
+        validation_status = validation_result['status']
+        final_score = validation_result['final_score']
+        details = validation_result.get('details', {})
+        
+        # Save to database
+        from sqlalchemy import func
+        if _use_postgis:
+            location_value = func.ST_SetSRID(func.ST_MakePoint(lon, lat), 4326)
+        else:
+            location_value = f"POINT({lon} {lat})"
+        
+        db_report = models.FloodReport(
+            user_id=user_id,
+            location=location_value,
+            latitude=lat,
+            longitude=lon,
+            depth_meters=depth_meters,
+            timestamp=datetime.fromisoformat(timestamp.replace('Z', '+00:00')) if isinstance(timestamp, str) else datetime.now(),
+            description=description or f"Photo report from {geotag.get('device_model', 'Unknown')}",
+            validation_status=validation_status,
+            final_score=final_score,
+            physical_score=details.get('physical', {}).get('layer1_score', 0.5),
+            statistical_score=details.get('statistical', {}).get('layer2_score', 0.5),
+            reputation_score=details.get('reputation', {}).get('layer3_score', 0.5),
+            validated_at=datetime.now()
+        )
+        
+        db.add(db_report)
+        db.commit()
+        db.refresh(db_report)
     else:
-        location_value = f"POINT({lon} {lat})"
-    
-    details = validation_result.get('details', {})
-    
-    db_report = models.FloodReport(
-        user_id=user_id,
-        location=location_value,
-        latitude=lat,
-        longitude=lon,
-        depth_meters=depth_meters,
-        timestamp=datetime.fromisoformat(timestamp.replace('Z', '+00:00')) if isinstance(timestamp, str) else datetime.now(),
-        description=description or f"Photo report from {geotag.get('device_model', 'Unknown')}",
-        validation_status=validation_result['status'],
-        final_score=validation_result['final_score'],
-        physical_score=details.get('physical', {}).get('layer1_score', 0.5),
-        statistical_score=details.get('statistical', {}).get('layer2_score', 0.5),
-        reputation_score=details.get('reputation', {}).get('layer3_score', 0.5),
-        validated_at=datetime.now()
-    )
-    
-    db.add(db_report)
-    db.commit()
-    db.refresh(db_report)
+        # If no Location, we rely purely on CV result for preview
+        final_score = cv_result.get("score", 0.0)
+        validation_status = "flagged" # Without location it cannot be validated
     
     return ImageReportResponse(
-        report_id=db_report.report_id,
+        report_id=db_report.report_id if db_report else 0,
         extracted_location={
             "latitude": lat,
             "longitude": lon,
@@ -402,7 +541,7 @@ async def submit_report_from_image(
             "confidence": cv_result.get("confidence", 0.0),
             "water_coverage": cv_result.get("water_coverage", 0.0)
         },
-        validation_status=validation_result['status'],
-        final_score=validation_result['final_score'],
-        message=f"Report created from geotagged image at ({lat:.4f}, {lon:.4f})"
+        validation_status=validation_status,
+        final_score=final_score,
+        message=f"Report processed. Location: {'Found' if lat else 'Missing'}"
     )

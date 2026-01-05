@@ -8,16 +8,16 @@ This directory contains comprehensive Mermaid.js diagrams documenting the **AI/M
 |---|---------|-------------|----------|
 | 01 | [System Architecture](./01_system_architecture.md) | High-level ecosystem visualization | Overview presentations |
 | 02 | [Data Ingestion Pipeline](./02_data_ingestion.md) | Real-time streaming architecture | Technical deep-dive |
-| 03 | [Validation Algorithm](./03_validation_algorithm.md) | 5-layer ML validation logic | **Research Paper** |
+| 03 | [Validation Algorithm](./03_validation_algorithm.md) | **5-layer ML validation logic** | **Research Paper** |
 | 04 | [Report Lifecycle](./04_report_lifecycle.md) | State diagram with sub-states | Database design |
-| 05 | [Database ER Diagram](./05_database_er.md) | PostGIS schema structure | Database documentation |
+| 05 | [Database ER Diagram](./05_database_er.md) | PostGIS/SQLite schema structure | Database documentation |
 | 06 | [API Sequence](./06_api_sequence.md) | Image upload workflow | API documentation |
 | 07 | [Deployment Architecture](./07_deployment_architecture.md) | Docker containerization | DevOps documentation |
-| 08 | [ML Model Architecture](./08_ml_model_architecture.md) | Machine learning pipeline | **Research Paper** |
+| 08 | [ML Model Architecture](./08_ml_model_architecture.md) | **RF, XGBoost, LightGBM, DBSCAN, CNN** | **Research Paper** |
 | 09 | [Trust Score Flow](./09_trust_score_flow.md) | Bayesian reputation system | Algorithm explanation |
 | 10 | [User Journey](./10_user_journey.md) | End-to-end user experience | UX documentation |
 | 11 | [Component Dependencies](./11_component_dependency.md) | Codebase module graph | Developer onboarding |
-| 12 | [Weight Learning Network](./12_validation_weight_network.md) | Adaptive weight optimization | **Research Paper** |
+| 12 | [Weight Learning Network](./12_validation_weight_network.md) | **Neural weight optimization** | **Research Paper** |
 | 13 | [Geospatial Processing](./13_geospatial_processing.md) | DEM/HAND/Slope pipeline | Geospatial methods |
 | 14 | [DBSCAN Clustering](./14_dbscan_clustering.md) | Spatial clustering algorithm | Algorithm explanation |
 | 15 | [Notification Flow](./15_notification_flow.md) | Emergency alert system | System design |
@@ -27,7 +27,8 @@ This directory contains comprehensive Mermaid.js diagrams documenting the **AI/M
 
 ## Quick Stats
 - **Total Diagrams:** 18 (with 6 additional sub-figures in Paper Figures)
-- **Diagram Types:** Flowcharts, State Diagrams, ER Diagrams, Sequence Diagrams, Journey Maps
+- **Validation Layers:** 5 (Physical, Statistical, Reputation, Social, Visual)
+- **ML Models:** Random Forest, XGBoost, LightGBM, DBSCAN, CNN (Image), Neural Weight Network
 - **Last Updated:** January 2026
 - **All diagrams include:** Color coding, technology labels, explanatory tables
 

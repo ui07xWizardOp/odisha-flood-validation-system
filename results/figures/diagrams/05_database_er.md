@@ -2,6 +2,8 @@
 
 The PostGIS database schema showing relationships between core entities in the flood validation system.
 
+> **Note:** For local development, the system falls back to SQLite. In SQLite mode, `geography` columns store WKT strings instead of PostGIS types.
+
 ## Mermaid Code
 
 ```mermaid

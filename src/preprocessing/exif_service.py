@@ -80,12 +80,17 @@ class ExifService:
             # Validate within Odisha bounds
             in_bounds = self._validate_odisha_bounds(lat, lon)
             
+            # check recency
+            is_recent, age_hours = self.is_image_recent(timestamp)
+
             return {
                 "success": True,
                 "latitude": lat,
                 "longitude": lon,
                 "altitude": self._get_altitude(gps_info),
                 "timestamp": timestamp,
+                "age_hours": age_hours,
+                "is_recent": is_recent,
                 "in_odisha_bounds": in_bounds,
                 "device_model": exif_data.get("Model", "Unknown"),
                 "image_width": image.width,
@@ -96,6 +101,30 @@ class ExifService:
         except Exception as e:
             logger.error(f"EXIF extraction failed: {e}")
             return self._empty_result(str(e))
+
+    def is_image_recent(self, timestamp_iso: Optional[str], max_age_hours: float = 2.0) -> Tuple[bool, float]:
+        """Check if image timestamp is within the allowed time window."""
+        if not timestamp_iso:
+            # If no timestamp, cannot verify recency
+            return False, 9999.0
+            
+        try:
+            # Timestamp is usually naive in EXIF, assume local time match or ignore timezone for simplicity
+            # Or better, treat both as naive or both as aware. 
+            # datetime.fromisoformat() returns naive if parsed from simple string
+            img_time = datetime.fromisoformat(timestamp_iso)
+            now = datetime.now() 
+            
+            # Handle potential timezone issues if implementation changes, but for now simple diff
+            age = (now - img_time).total_seconds() / 3600.0
+            
+            # Allow negative age (clock skew) but not too much into future?
+            # For now just abs(age) < max_age? No, future dates are suspicious.
+            # But let's stick to positive age.
+            
+            return (0 <= age <= max_age_hours), age
+        except Exception:
+            return False, 9999.0
     
     def _get_exif_data(self, image: Image.Image) -> Dict:
         """Extract and decode EXIF data from image."""
