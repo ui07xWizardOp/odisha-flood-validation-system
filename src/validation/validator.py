@@ -33,7 +33,7 @@ from src.preprocessing.hazard_zones import flood_hazard_zone
 # ML Models
 from src.ml.models.dbscan_clustering import spatial_analyzer
 from src.ml.models.weight_network import WeightLearningNetwork
-from src.ml.models.image_classifier import flood_classifier
+from src.ml.models.ensemble_classifier import ensemble_classifier as flood_classifier  # L5 Visual
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class FloodReportValidator:
     Main Orchestrator for the 5-Layer ML-Enhanced Validation System.
     """
     
-    VALIDATION_THRESHOLD = 0.7
+    VALIDATION_THRESHOLD = 0.65
     WEIGHT_MODEL_PATH = "models/weight_network.json"
     
     def __init__(self, use_ml_weights: bool = True):

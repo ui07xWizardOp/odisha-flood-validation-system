@@ -31,6 +31,15 @@ This repository contains the implementation of a novel **five-layer ML-enhanced 
 
 ---
 
+## ✨ Key Features
+
+- **Magic Photo Upload**: Drag & drop any image (desktop/mobile) to automatically extract GPS data, timestamp, and receive instant CV flood analysis.
+- **Hybrid Validation Engine**: Combines 5 layers of verification including a fallback-resilient Computer Vision module (CNN + OpenCV).
+- **Responsive Dashboard**: Full mobile support with interactive Mapbox integration and GSAP animations.
+- **Zero-Click Reporting**: Auto-populates location and time from EXIF data, minimizing user effort.
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -84,6 +93,8 @@ If you encounter startup issues:
 |-------|----------|
 | `No module named uvicorn` | Run `pip install uvicorn[standard]` in your venv |
 | `NameError: 'Any' not defined` | Fixed in `schemas.py` (ensure `Any` is imported from `typing`) |
+| `Module not found: gsap` | Run `npm install gsap` in `src/frontend/web-dashboard` |
+| **Missing GPS Warning** | If uploaded photos lack geotags, the system gracefully degrades to "N/A" location and skips DB storage (Preview Mode). |
 | PostgreSQL Auth Failed | The system will fallback to SQLite automatically. No action needed. |
 | Python 3.13 Build Errors | Use Python 3.11 (`py -3.11 -m venv .venv`) to avoid compilation issues. |
 

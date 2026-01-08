@@ -60,32 +60,57 @@ class FloodImageClassifier:
             self._setup_transforms()
     
     def _load_model(self):
-        """Load trained MobileNetV2 model or fallback to pretrained."""
+        """Load trained MobileNetV2 model. Priority: balanced > Kaggle > v2."""
         try:
-            # Check if model file exists
-            # Load weights if available
-            model_path = "models/flood_cnn_v2.pth"  # Updated to v2 model
+            models_dir = Path(__file__).parent.parent.parent.parent / "models"
             
-            if Path(model_path).exists():
-                # Reconstruct the model architecture (matches v2 training)
-                self.model = models.mobilenet_v2(weights=None) 
+            # Priority 0: Balanced model (trained on 50/50 flood/not-flood) - Best specificity
+            balanced_model_path = models_dir / "mobilenetv2_flood_balanced_final.pth"
+            
+            # Priority 1: Kaggle Flood Dataset model (93%+ accuracy)
+            kaggle_model_path = models_dir / "mobilenetv2_flood_final.pth"
+            
+            # Priority 2: v2 model (FloodNet trained)
+            v2_model_path = models_dir / "flood_cnn_v2.pth"
+            
+            # Try loading in priority order
+            model_path = None
+            if balanced_model_path.exists():
+                model_path = balanced_model_path
+                model_name = "Balanced (50/50)"
+            elif kaggle_model_path.exists():
+                model_path = kaggle_model_path
+                model_name = "Kaggle"
+            elif v2_model_path.exists():
+                model_path = v2_model_path
+                model_name = "v2"
+            
+            if model_path:
+                # Load model with simple classifier head (works for balanced, Kaggle, and v2)
+                self.model = models.mobilenet_v2(weights=None)
                 self.model.classifier = nn.Sequential(
-                    nn.Dropout(0.3),
-                    nn.Linear(1280, 256),
-                    nn.ReLU(),
                     nn.Dropout(0.2),
-                    nn.Linear(256, 1),
+                    nn.Linear(self.model.last_channel, 1),
                     nn.Sigmoid()
                 )
                 
-                state_dict = torch.load(model_path, map_location=torch.device('cpu'))
-                self.model.load_state_dict(state_dict)
-                logger.info(f"Loaded custom flood model from {model_path}")
+                checkpoint = torch.load(str(model_path), map_location=torch.device('cpu'))
+                
+                # Handle both full checkpoint and state_dict only formats
+                if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+                    self.model.load_state_dict(checkpoint['model_state_dict'])
+                    acc = checkpoint.get('model_config', {}).get('best_val_acc', 'N/A')
+                    logger.info(f"Loaded {model_name} model (acc: {acc})")
+                else:
+                    self.model.load_state_dict(checkpoint)
+                    logger.info(f"Loaded {model_name} model from {model_path}")
+                
+                self.model.eval()
             else:
-                logger.warning(f"Custom model not found at {model_path}. Disabling DL component.")
-                # Do NOT load random model. Set to None so we fall back to OpenCV.
+                logger.warning(f"No custom flood model found. Disabling DL component.")
                 self.model = None
-
+                return
+            
         except Exception as e:
             logger.error(f"Failed to load PyTorch model: {e}")
             self.model = None
@@ -106,57 +131,61 @@ class FloodImageClassifier:
         """
         Classify an image as flood/not-flood.
         
-        Uses a combination of:
-        1. Deep learning features (if PyTorch available)
-        2. Color-based water detection (if OpenCV available)
-        
-        Note: Both methods must agree for positive classification to reduce false positives.
+        ULTRA-CONSERVATIVE: Default is NOT flood.
+        Requires strong evidence from BOTH OpenCV AND CNN to classify as flood.
         """
         water_ratio = 0.0
-        is_flood = False
-        confidence = 0.5
+        is_flood = False  # Default: NOT flood (conservative)
+        confidence = 0.6  # Default confidence for "not flood"
         model_used = "Heuristic"
         dl_confidence = 0.0
         
-        # Step 1: OpenCV water detection (always try first if available)
+        # Step 1: OpenCV water detection
         if CV2_AVAILABLE:
             water_ratio = self._detect_water_ratio(image_data)
             model_used = "OpenCV-Water"
             
-            # INCREASED thresholds to reduce false positives
-            # Water coverage based classification (conservative)
-            if water_ratio > 0.35:  # Was 0.3 - require significant water
+            # BALANCED: Flag if >20% of image is water-colored
+            if water_ratio > 0.20:
                 is_flood = True
-                confidence = min(0.6 + water_ratio, 0.95)
-            elif water_ratio > 0.25:  # Was 0.15 - moderate water
-                is_flood = True
-                confidence = 0.5 + water_ratio
+                confidence = min(0.60 + water_ratio, 0.90)
             else:
                 is_flood = False
-                confidence = 0.7  # More confident it's NOT flood
+                confidence = 0.75  # Confident it's NOT flood
         
-        # Step 2: Deep learning refinement (if available)
+        # Step 2: Deep learning refinement
         if TORCH_AVAILABLE and self.model is not None:
             try:
                 dl_result = self._deep_learning_predict(image_data)
                 dl_confidence = dl_result['confidence']
+                model_used = "MobileNetV2+OpenCV"
                 
-                # STRICTER: Require BOTH high DL confidence AND visible water
-                if dl_confidence > 0.7:  # Was 0.5 - require higher CNN confidence
-                    if water_ratio > 0.2:  # Was 0.1 - require visible water
-                        is_flood = True
-                        confidence = (dl_confidence + water_ratio) / 2 + 0.3
-                        confidence = min(confidence, 0.95)
-                    else:
-                        # DL says flood but no visible water - be cautious
-                        is_flood = dl_confidence > 0.85  # Only if very confident
-                        confidence = dl_confidence * 0.8  # Reduce confidence
-                    model_used = "MobileNetV2+OpenCV"
-                elif dl_confidence < 0.3:
-                    # DL is confident it's NOT flood - trust it
+                # BALANCED DECISION LOGIC (Kaggle-trained model):
+                # Flood = True if:
+                #   - CNN > 60% confident AND water > 10% (Common street flood)
+                #   - OR water > 30% (Strong visual evidence, trust OpenCV)
+                #   - OR CNN > 85% AND water > 5% (Strong model confidence with minimal water evidence)
+                
+                if dl_confidence > 0.60 and water_ratio > 0.10:
+                    # Moderate confidence + some water = flood
+                    is_flood = True
+                    confidence = (dl_confidence + water_ratio) / 2 + 0.2
+                elif water_ratio > 0.30:
+                    # Significant water coverage = flood (trust OpenCV)
+                    is_flood = True
+                    confidence = 0.6 + water_ratio
+                elif dl_confidence > 0.85 and water_ratio > 0.05:
+                    # Very high model confidence WITH minimal water evidence
+                    is_flood = True
+                    confidence = dl_confidence
+                elif dl_confidence < 0.40 or water_ratio < 0.03:
+                    # CNN says NOT flood OR no water detected = NOT flood
                     is_flood = False
-                    confidence = max(confidence, 1 - dl_confidence)
-                    model_used = "MobileNetV2+OpenCV"
+                    confidence = max(0.60, 1 - dl_confidence)
+                else:
+                    # Uncertain zone (40-60% confidence)
+                    is_flood = False
+                    confidence = 0.50
                     
             except Exception as e:
                 logger.error(f"DL prediction failed: {e}")
@@ -195,11 +224,11 @@ class FloodImageClassifier:
     
     def _detect_water_ratio(self, image_data: bytes) -> float:
         """
-        Use color analysis to estimate water coverage in image.
-        Detects:
-        - Blue water (clear)
-        - Brown/muddy water (flood water)
-        - Dark reflective surfaces (standing water)
+        Use HSV color analysis + texture variance to estimate water coverage.
+        
+        Improvements over simple color:
+        - Texture check: Water is smooth (low variance), concrete is textured (high variance)
+        - Stricter gray detection to avoid false positives on buildings
         """
         try:
             # Decode image
@@ -211,36 +240,54 @@ class FloodImageClassifier:
             
             # Convert to HSV for better color detection
             hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             
-            # Define water color ranges
-            # Blue water
+            # Calculate texture variance (Laplacian for edge detection)
+            laplacian = cv2.Laplacian(gray, cv2.CV_64F)
+            texture_variance = laplacian.var()
+            
+            # Define water color ranges (HSV)
+            # Blue water (H: 90-130, high saturation)
             lower_blue = np.array([90, 50, 50])
             upper_blue = np.array([130, 255, 255])
             
-            # Brown/muddy water (common in floods)
+            # Brown/muddy water (H: 10-30, moderate saturation)
             lower_brown = np.array([10, 50, 50])
             upper_brown = np.array([30, 200, 200])
             
-            # Gray/dark (reflective standing water)
-            lower_gray = np.array([0, 0, 40])
-            upper_gray = np.array([180, 50, 120])
+            # Gray/dark (potential standing water) - STRICTER thresholds
+            # Only low saturation AND specific value range
+            lower_gray = np.array([0, 0, 50])
+            upper_gray = np.array([180, 30, 100])  # Reduced saturation threshold
             
             # Create masks
             blue_mask = cv2.inRange(hsv, lower_blue, upper_blue)
             brown_mask = cv2.inRange(hsv, lower_brown, upper_brown)
             gray_mask = cv2.inRange(hsv, lower_gray, upper_gray)
             
-            # Combine masks with weights
-            # Blue and brown are more indicative of flood
-            water_mask = cv2.bitwise_or(blue_mask, brown_mask)
+            # Combine blue and brown (definite water colors)
+            definite_water = cv2.bitwise_or(blue_mask, brown_mask)
             
             # Calculate ratios
             total_pixels = img.shape[0] * img.shape[1]
-            water_pixels = np.sum(water_mask > 0)
+            definite_water_pixels = np.sum(definite_water > 0)
             gray_pixels = np.sum(gray_mask > 0)
             
-            # Weight: blue/brown water counts more than gray
-            water_ratio = (water_pixels + gray_pixels * 0.3) / total_pixels
+            # Base water ratio from definite water colors
+            water_ratio = definite_water_pixels / total_pixels
+            
+            # TEXTURE CHECK: Only add gray as water if texture is LOW (smooth like water)
+            # Buildings/concrete have high texture variance (>500), water has low (<200)
+            TEXTURE_THRESHOLD = 300
+            
+            if texture_variance < TEXTURE_THRESHOLD:
+                # Low texture = likely water surface, count gray pixels
+                gray_water_ratio = (gray_pixels * 0.5) / total_pixels
+                water_ratio += gray_water_ratio
+            else:
+                # High texture = probably buildings/roads, reduce gray contribution
+                gray_water_ratio = (gray_pixels * 0.05) / total_pixels
+                water_ratio += gray_water_ratio
             
             return min(float(water_ratio), 1.0)
             

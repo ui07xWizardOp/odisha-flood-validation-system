@@ -53,7 +53,13 @@ def seed_default_user():
 # CORS Security
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, restrict to specific domains
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8001",
+        "http://localhost:8002",
+        "*"  # Fallback for other potential origins if needed
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -285,6 +291,8 @@ def submit_report(report: schemas.FloodReportCreate, db: Session = Depends(get_d
     physical_score = details.get('physical', {}).get('layer1_score', 0.5)
     statistical_score = details.get('statistical', {}).get('layer2_score', 0.5)
     reputation_score = details.get('reputation', {}).get('layer3_score', 0.5)
+    social_score = details.get('social', {}).get('layer4_score', 0.5)
+    cv_score = details.get('visual', {}).get('layer5_score', 0.5)
     
     db_report = models.FloodReport(
         user_id=report.user_id,
@@ -302,6 +310,8 @@ def submit_report(report: schemas.FloodReportCreate, db: Session = Depends(get_d
         physical_score=physical_score,
         statistical_score=statistical_score,
         reputation_score=reputation_score,
+        social_score=social_score,
+        cv_score=cv_score,
         
         validated_at=datetime.now()
     )
@@ -349,8 +359,8 @@ def get_nearby_reports(lat: float, lon: float, radius_m: int = 1000, db: Session
 # Photo Validation Endpoint (Computer Vision)
 # ==========================================
 
-from fastapi import File, UploadFile
-from src.ml.models.image_classifier import flood_classifier
+from fastapi import File, UploadFile, Form
+from src.ml.models.ensemble_classifier import ensemble_classifier as flood_classifier  # Use ensemble for L5
 
 class PhotoValidationResponse(schemas.BaseModel):
     valid: bool
@@ -359,6 +369,7 @@ class PhotoValidationResponse(schemas.BaseModel):
     water_coverage: float
     model_used: str
     validation_score: float
+    location: Optional[dict] = None
 
 @app.post("/validate-photo", response_model=PhotoValidationResponse)
 async def validate_flood_photo(file: UploadFile = File(...)):
@@ -384,13 +395,25 @@ async def validate_flood_photo(file: UploadFile = File(...)):
     # Run CV validation
     result = flood_classifier.validate_image(contents)
     
+    # Extract GPS (for frontend auto-fill)
+    from src.preprocessing.exif_service import exif_service
+    geotag = exif_service.extract_geotag(contents)
+    
+    location_data = None
+    if geotag["success"]:
+        location_data = {
+            "latitude": geotag["latitude"],
+            "longitude": geotag["longitude"]
+        }
+    
     return PhotoValidationResponse(
         valid=result.get("valid", False),
         is_flood_detected=result.get("is_flood_detected", False),
         confidence=result.get("confidence", 0.0),
         water_coverage=result.get("water_coverage", 0.0),
         model_used=result.get("model_used", "Unknown"),
-        validation_score=result.get("score", 0.0)
+        validation_score=result.get("score", 0.0),
+        location=location_data
     )
 
 
@@ -406,26 +429,41 @@ class ImageReportResponse(schemas.BaseModel):
     cv_result: dict
     validation_status: str
     final_score: float
+    physical_score: Optional[float] = None
+    statistical_score: Optional[float] = None
+    reputation_score: Optional[float] = None
+    social_score: Optional[float] = None
+    cv_score: Optional[float] = None
     message: str
 
 @app.post("/reports/from-image", response_model=ImageReportResponse)
 async def submit_report_from_image(
     file: UploadFile = File(...),
-    user_id: int = 1,
-    depth_meters: float = 1.0,
-    description: str = "",
+    user_id: int = Form(1),
+    depth_meters: float = Form(1.0),
+    description: str = Form(""),
+    latitude: Optional[float] = Form(None),
+    longitude: Optional[float] = Form(None),
     db: Session = Depends(get_db)
 ):
+    print(f"[DEBUG] Received Image Report Request:")
+    print(f"User ID: {user_id}, Depth: {depth_meters}")
+    print(f"Latitude: {latitude}, Longitude: {longitude}")
+    print(f"File Type: {file.content_type}")
+    
     """
     One-shot flood report submission from a geotagged image.
     
     Extracts GPS coordinates from EXIF, validates with CV, and creates report.
+    Allows manual override of location if provided.
     
     Args:
         file: Geotagged image (JPEG with GPS EXIF)
         user_id: Reporter ID
         depth_meters: Observed flood depth (optional, default 1.0m)
         description: Optional description
+        latitude: Manual override latitude
+        longitude: Manual override longitude
     
     Returns:
         Complete report with extracted location and validation results
@@ -445,18 +483,29 @@ async def submit_report_from_image(
     # Extract GPS from EXIF
     geotag = exif_service.extract_geotag(contents)
     
-    # === FALLBACK FOR DEMO / TESTING ===
-    # If no GPS found, use None (User requested N/A)
-    if not geotag["success"]:
-        print("[WARN] No GPS found in image. Skipping Location & DB Save.")
-        lat = None
-        lon = None
-        timestamp = datetime.now()
-        description = description + " [No GPS Data]"
-    else:
+    # Initialize timestamp default
+    timestamp = datetime.now()
+    
+    # Determine Location Strategy
+    # Priority 1: Manual Override
+    # Priority 2: EXIF Data
+    
+    lat = latitude
+    lon = longitude
+    
+    if lat is not None and lon is not None:
+        # User provided manual location
+        pass
+    elif geotag["success"]:
+        # Fallback to EXIF
         lat = geotag["latitude"]
         lon = geotag["longitude"]
-        timestamp = geotag["timestamp"]
+        timestamp = geotag["timestamp"] if geotag["timestamp"] else timestamp
+    else:
+        # No location found
+        print("[WARN] No GPS found in image and no manual location provided.")
+        lat = None
+        lon = None
     
     if not timestamp:
          timestamp = datetime.now().isoformat()
@@ -468,6 +517,7 @@ async def submit_report_from_image(
     validation_status = "flagged"
     final_score = 0.0
     db_report = None
+    validation_result = {}
     
     if lat is not None and lon is not None:
         import pandas as pd
@@ -516,6 +566,8 @@ async def submit_report_from_image(
             physical_score=details.get('physical', {}).get('layer1_score', 0.5),
             statistical_score=details.get('statistical', {}).get('layer2_score', 0.5),
             reputation_score=details.get('reputation', {}).get('layer3_score', 0.5),
+            social_score=details.get('social', {}).get('layer4_score', 0.5),
+            cv_score=details.get('visual', {}).get('layer5_score', 0.5),
             validated_at=datetime.now()
         )
         
@@ -527,21 +579,33 @@ async def submit_report_from_image(
         final_score = cv_result.get("score", 0.0)
         validation_status = "flagged" # Without location it cannot be validated
     
-    return ImageReportResponse(
-        report_id=db_report.report_id if db_report else 0,
-        extracted_location={
-            "latitude": lat,
-            "longitude": lon,
-            "altitude": geotag.get("altitude"),
-            "in_odisha_bounds": geotag.get("in_odisha_bounds", False),
-            "device": geotag.get("device_model")
-        },
-        cv_result={
-            "is_flood": cv_result.get("is_flood_detected", False),
-            "confidence": cv_result.get("confidence", 0.0),
-            "water_coverage": cv_result.get("water_coverage", 0.0)
-        },
-        validation_status=validation_status,
-        final_score=final_score,
-        message=f"Report processed. Location: {'Found' if lat else 'Missing'}"
-    )
+    # TRACER removed
+    
+    try:
+        return ImageReportResponse(
+            report_id=db_report.report_id if db_report else 0,
+            extracted_location={
+                "latitude": lat,
+                "longitude": lon,
+                "altitude": geotag.get("altitude"),
+                "in_odisha_bounds": geotag.get("in_odisha_bounds", False),
+                "device": geotag.get("device_model")
+            },
+            cv_result={
+                "is_flood": bool(cv_result.get("is_flood_detected", False)),
+                "confidence": float(cv_result.get("confidence", 0.0)),
+                "water_coverage": float(cv_result.get("water_coverage", 0.0))
+            },
+            validation_status=validation_status,
+            final_score=float(final_score),
+            physical_score=float(db_report.physical_score if db_report else validation_result.get('details', {}).get('physical', {}).get('layer1_score', 0.5)),
+            statistical_score=float(db_report.statistical_score if db_report else validation_result.get('details', {}).get('statistical', {}).get('layer2_score', 0.5)),
+            reputation_score=float(db_report.reputation_score if db_report else validation_result.get('details', {}).get('reputation', {}).get('layer3_score', 0.5)),
+            social_score=float(db_report.social_score if db_report else validation_result.get('details', {}).get('social', {}).get('layer4_score', 0.5)),
+            cv_score=float(db_report.cv_score if db_report else validation_result.get('details', {}).get('visual', {}).get('layer5_score', 0.5)),
+            message=f"Report processed. Location: {'Found' if lat else 'Missing'}"
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal Logic Error: {str(e)}")

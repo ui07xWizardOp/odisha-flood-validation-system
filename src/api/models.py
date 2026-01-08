@@ -74,6 +74,8 @@ class FloodReport(Base):
     physical_score = Column(Float)
     statistical_score = Column(Float)
     reputation_score = Column(Float)
+    social_score = Column(Float)      # Layer 4: Social Context / News API
+    cv_score = Column(Float)          # Layer 5: Computer Vision / Visual
     
     # Metadata
     is_synthetic = Column(Boolean, default=False)

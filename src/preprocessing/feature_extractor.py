@@ -9,14 +9,18 @@ class FeatureExtractor:
     using the processed rasters.
     """
     
+    # Detect project root (where data/ folder is)
+    PROJECT_ROOT = Path(__file__).parent.parent.parent
+    
     def __init__(self, 
-                 dem_path: str = "data/processed/mahanadi_dem_30m.tif",
-                 hand_path: str = "data/processed/mahanadi_hand.tif",
-                 slope_path: str = "data/processed/mahanadi_slope.tif"):
+                 dem_path: str = None,
+                 hand_path: str = None,
+                 slope_path: str = None):
         
-        self.dem_path = Path(dem_path)
-        self.hand_path = Path(hand_path)
-        self.slope_path = Path(slope_path)
+        # Use absolute paths from project root
+        self.dem_path = Path(dem_path) if dem_path else self.PROJECT_ROOT / "data/processed/mahanadi_dem_30m.tif"
+        self.hand_path = Path(hand_path) if hand_path else self.PROJECT_ROOT / "data/processed/mahanadi_hand.tif"
+        self.slope_path = Path(slope_path) if slope_path else self.PROJECT_ROOT / "data/processed/mahanadi_slope.tif"
         
         self.datasets = {}
         

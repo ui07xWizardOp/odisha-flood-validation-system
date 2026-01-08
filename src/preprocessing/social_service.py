@@ -22,7 +22,7 @@ class SocialMediaService:
     
     def __init__(self):
         # Load from .env or use provided key
-        self.news_api_key = os.getenv("NEWS_API_KEY", "pub_bad062c65c504ec7bd821aaca2685cc3")
+        self.news_api_key = os.getenv("NEWS_API_KEY", "pub_7243e36f2587484584682f667d438242")
         self.telegram_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
     def get_social_context(self, location="Odisha"):

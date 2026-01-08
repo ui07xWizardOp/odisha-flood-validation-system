@@ -15,6 +15,15 @@ Currently no authentication required for development. Production should use JWT 
 
 ## Endpoints
 
+### Validation Fallbacks & Edge Cases
+
+The system is designed to degrade gracefully:
+
+1.  **Missing GPS Data**: If an uploaded image lacks EXIF GPS tags, the system enters **Preview Mode**. The report will be processed for CV analysis but **will not be saved to the database**. The location fields in the response will be `null`.
+2.  **Missing CV Model**: If the custom CNN model weights are unavailable, the system automatically falls back to **OpenCV-based water detection** (heuristic analysis) to ensure service continuity.
+
+---
+
 ### Health & Stats
 
 #### Health Check
@@ -185,6 +194,28 @@ Content-Type: multipart/form-data
   "validation_status": "validated",
   "final_score": 0.85,
   "message": "Report created from geotagged image at (20.4625, 85.8830)"
+}
+```
+
+**Response (Missing GPS - Preview Mode):**
+```json
+{
+  "report_id": 0,
+  "extracted_location": {
+    "latitude": null,
+    "longitude": null,
+    "altitude": null,
+    "in_odisha_bounds": false,
+    "device": null
+  },
+  "cv_result": {
+    "is_flood": true,
+    "confidence": 0.82,
+    "water_coverage": 0.35
+  },
+  "validation_status": "pending",
+  "final_score": 0.0,
+  "message": "Report processed. Location: Missing"
 }
 ```
 

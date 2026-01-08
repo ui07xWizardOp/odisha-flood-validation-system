@@ -62,6 +62,8 @@ class FloodReportResponse(FloodReportBase):
     physical_score: Optional[float] = None
     statistical_score: Optional[float] = None
     reputation_score: Optional[float] = None
+    social_score: Optional[float] = None     # Layer 4: News API
+    cv_score: Optional[float] = None         # Layer 5: Vision
     
     created_at: datetime
     
