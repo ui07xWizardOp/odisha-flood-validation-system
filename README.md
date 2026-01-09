@@ -14,11 +14,11 @@ A Case Study of the Mahanadi Delta, Odisha
 
 This repository contains the implementation of a novel **five-layer ML-enhanced validation framework** for crowdsourced flood reports, integrating:
 
-1. **Physical Plausibility** - DEM, HAND, slope analysis (Random Forest)
-2. **Statistical Consistency** - Spatial clustering (DBSCAN + XGBoost)
-3. **User Reputation** - Bayesian trust scoring
-4. **Social Context** - News API correlation
-5. **Visual Verification** - Computer vision flood detection
+1. **Physical Plausibility** - DEM, HAND, slope analysis (Rule-based scoring)
+2. **Statistical Consistency** - Spatial clustering (DBSCAN + Hybrid scoring)
+3. **User Reputation** - Trust increment/decrement (+0.1/-0.15)
+4. **Social Context** - NewsData.io correlation
+5. **Visual Verification** - Hybrid Ensemble (MobileNetV2 + OpenCV)
 
 **Study Area**: Mahanadi Delta, Odisha, India (Cyclone Fani 2019)
 
@@ -116,7 +116,7 @@ odisha-flood-validation/
 │
 ├── src/                     # Source code
 │   ├── preprocessing/       # DEM processing, HAND calculation
-│   ├── validation/          # 3-layer validation algorithm
+│   ├── validation/          # 5-layer validation algorithm
 │   ├── api/                 # FastAPI backend
 │   ├── experiments/         # Synthetic data, baselines
 │   └── utils/               # Helper functions

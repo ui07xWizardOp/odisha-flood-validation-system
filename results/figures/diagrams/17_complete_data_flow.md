@@ -34,7 +34,7 @@ flowchart TD
 
     subgraph Preprocessing["⚙️ Preprocessing Pipeline"]
         PP1["Schema Validation<br/>(Pydantic)"]
-        PP2["Geocoding<br/>(Google Maps API)"]
+        PP2["EXIF GPS Extraction<br/>(Pillow PIL)"]
         PP3["Deduplication<br/>(RapidFuzz > 0.9)"]
         PP4["Language Detection<br/>(langdetect)"]
         PP5["Image Compression<br/>(Pillow, max 1MB)"]
@@ -48,11 +48,11 @@ flowchart TD
     end
 
     subgraph ValidationPipeline["🤖 5-Layer Validation"]
-        V1["Layer 1: Physical<br/>Random Forest + Rasters"]
-        V2["Layer 2: Statistical<br/>DBSCAN Clustering"]
-        V3["Layer 3: Reputation<br/>Bayesian Trust"]
-        V4["Layer 4: Social<br/>NewsAPI + NLP"]
-        V5["Layer 5: Vision<br/>ResNet-50 CNN"]
+        V1["Layer 1: Physical<br/>Rule Scoring + Rasters"]
+        V2["Layer 2: Statistical<br/>Hybrid DBSCAN"]
+        V3["Layer 3: Reputation<br/>SimpleTrust Scoring"]
+        V4["Layer 4: Social<br/>NewsData.io + NLP"]
+        V5["Layer 5: Vision<br/>Hybrid Ensemble"]
         VA["Weight Aggregation<br/>Σ wᵢ × sᵢ"]
     end
 
@@ -72,7 +72,7 @@ flowchart TD
         
         subgraph Alerts["🚨 Alert System"]
             A1["Firebase FCM<br/>(Push Notifications)"]
-            A2["Twilio SMS<br/>(Affected Users)"]
+            A2["Push Notifications<br/>(Firebase FCM)"]
             A3["Email Digest<br/>(Admins)"]
         end
         
@@ -198,11 +198,11 @@ flowchart TD
 | **Citizen Input** | Multipart Form | Kafka Message | Extract EXIF, compress image |
 | **Social Media** | JSON Tweet | Kafka Message | Parse coordinates, extract keywords |
 | **Preprocessing** | Kafka Message | DB Record | Geocode, dedupe, normalize |
-| **Validation L1** | DB Record + Rasters | Float [0,1] | RF inference |
-| **Validation L2** | DB Records (nearby) | Float [0,1] | DBSCAN + score |
-| **Validation L3** | User History | Float [0,1] | Bayesian update |
-| **Validation L4** | News Articles | Float [0,1] | NLP corroboration |
-| **Validation L5** | Image Bytes | Float [0,1] | CNN classification |
+| **Validation L1** | DB Record + Rasters | Float [0,1] | Rule-based inference |
+| **Validation L2** | DB Records (nearby) | Float [0,1] | Hybrid DBSCAN + score |
+| **Validation L3** | User History | Float [0,1] | Trust increment/decrement |
+| **Validation L4** | News Articles | Float [0,1] | NewsData.io corroboration |
+| **Validation L5** | Image Bytes | Float [0,1] | Hybrid Ensemble (CNN+OpenCV) |
 | **Aggregation** | 5 Layer Scores | Final Score | Weighted sum |
 | **Output** | Final Score | Action | Route based on threshold |
 

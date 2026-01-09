@@ -22,23 +22,23 @@ flowchart TD
     end
 
     subgraph Models["🧠 ML Models"]
-        subgraph Ensemble["🌲 Ensemble Models"]
-            RF["🌳 Random Forest<br/>(Physical Plausibility)<br/>n_estimators=100"]
+        subgraph Ensemble["📊 Scoring Models"]
+            RULE["📊 Rule-based Scoring<br/>(Physical Plausibility)<br/>HAND, Slope, Elevation"]
             LGB["📈 LightGBM<br/>(Gradient Boosting)<br/>num_leaves=31"]
-            XGB["🚀 XGBoost<br/>(Alternative Ensemble)<br/>max_depth=6"]
         end
         
         subgraph Clustering["📊 Clustering"]
             DBSCAN["🔬 DBSCAN<br/>(Spatial Consistency)<br/>eps=1km, min_samples=3"]
         end
         
-        subgraph DeepLearning["🧠 Deep Learning"]
-            CNN["🖼️ CNN (ResNet-50)<br/>(Image Classification)<br/>Fine-tuned for Floods"]
-            WATER_SEG["💧 Water Segmentation<br/>(U-Net Lite)"]
+        subgraph DeepLearning["🧠 Hybrid Vision"]
+            CNN["🖼️ MobileNetV2<br/>(Image Classification)<br/>45% Weight"]
+            HSV_DET["💧 HSV Water Detection<br/>(OpenCV)<br/>30% Weight"]
+            TEXTURE["📐 Texture Analysis<br/>(Laplacian Variance)<br/>15% Weight"]
         end
         
-        subgraph Probabilistic["🎲 Probabilistic"]
-            BAYESIAN["📊 Bayesian Trust<br/>(Beta Distribution)<br/>α, β updates"]
+        subgraph Probabilistic["🎲 Trust Scoring"]
+            TRUST_SCORE["📊 Trust Score<br/>(Increment/Decrement)<br/>+0.1 / -0.15"]
         end
     end
 
@@ -68,15 +68,16 @@ flowchart TD
     SPATIAL --> DBSCAN
     USER --> BAYESIAN
     IMG --> CNN
-    CNN --> WATER_SEG
+    IMG --> HSV_DET
+    CNN --> TEXTURE
     
     %% Model Outputs
-    RF --> L1
+    RULE --> L1
     LGB --> L1
     DBSCAN --> L2
-    BAYESIAN --> L3
+    TRUST_SCORE --> L3
     TEXT_FE --> L4
-    WATER_SEG --> L5
+    TEXTURE --> L5
 
     %% Weight Learning
     L1 --> ADAPTIVE
@@ -97,8 +98,8 @@ flowchart TD
 
     class GEO,TEMPORAL,USER,IMG,CONTEXT inputNode
     class RASTER,SPATIAL,TEMPORAL_FE,TEXT_FE feNode
-    class RF,LGB,XGB,DBSCAN,BAYESIAN modelNode
-    class CNN,WATER_SEG dlNode
+    class RULE,LGB,DBSCAN,TRUST_SCORE modelNode
+    class CNN,HSV_DET,TEXTURE dlNode
     class ADAPTIVE,GRADIENT weightNode
     class L1,L2,L3,L4,L5,FINAL outputNode
 ```
@@ -107,12 +108,12 @@ flowchart TD
 
 | Model | Library | Purpose | Hyperparameters |
 |-------|---------|---------|-----------------|
-| **Random Forest** | scikit-learn | Physical Plausibility | n_estimators=100, max_depth=15 |
+| **Rule Scoring** | Python | Physical Plausibility | HAND<10m, Slope<15° |
 | **LightGBM** | lightgbm | Ensemble Boosting | num_leaves=31, learning_rate=0.05 |
-| **XGBoost** | xgboost | Alternative Ensemble | max_depth=6, n_estimators=200 |
 | **DBSCAN** | scikit-learn | Spatial Clustering | eps=1000m, min_samples=3 |
-| **ResNet-50** | PyTorch | Flood Detection | pretrained=ImageNet, fine-tuned |
-| **Beta Distribution** | scipy.stats | Trust Scoring | α=1.0, β=1.0 (prior) |
+| **MobileNetV2** | PyTorch | Flood Detection | pretrained=ImageNet, fine-tuned |
+| **HSV Detection** | OpenCV | Water Color Analysis | Blue, Brown, Green masks |
+| **Trust Scoring** | Python | User Reputation | +0.1 validated, -0.15 flagged |
 
 ## Training Pipeline
 

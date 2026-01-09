@@ -14,7 +14,7 @@ sequenceDiagram
     participant S3 as ☁️ AWS S3
     participant Classifier as 🧠 Image Classifier
     participant DB as 🐘 PostGIS
-    participant Notify as 📞 Twilio
+    participant Notify as 📢 Push Notifications
 
     User->>PWA: Capture Flood Photo
     activate PWA
@@ -38,7 +38,7 @@ sequenceDiagram
         activate Classifier
         Classifier->>Classifier: Preprocess (resize 224x224)
         Classifier->>Classifier: CNN Forward Pass
-        Classifier->>Classifier: Water Segmentation
+        Classifier->>Classifier: Hybrid Ensemble (CNN + HSV)
         Classifier-->>API: {is_flood: true, confidence: 0.87, water_ratio: 0.42}
         deactivate Classifier
     end
@@ -51,7 +51,7 @@ sequenceDiagram
         
         API->>API: Trigger Async Validation
         
-        API->>Notify: SMS Alert (if critical)
+        API->>Notify: Push/Email Alert (if critical)
         activate Notify
         Notify-->>API: Message SID
         deactivate Notify
@@ -178,7 +178,7 @@ Content-Type: image/jpeg
   "is_flood_detected": true,
   "confidence": 0.87,
   "water_coverage": 0.42,
-  "model_used": "resnet50_flood_v2",
+  "model_used": "hybrid_ensemble_v1",
   "validation_score": 0.85
 }
 ```
@@ -190,7 +190,7 @@ Content-Type: image/jpeg
   "is_flood_detected": false,
   "confidence": 0.12,
   "water_coverage": 0.03,
-  "model_used": "resnet50_flood_v2",
+  "model_used": "hybrid_ensemble_v1",
   "validation_score": 0.0
 }
 ```

@@ -1,13 +1,13 @@
 # Diagram 9: Trust Score Computation Flow
 
-Detailed diagram of the Bayesian trust score system that tracks user reputation based on their historical report accuracy.
+Detailed diagram of the simplified trust score system that tracks user reputation based on report validation outcomes.
 
 ## Mermaid Code
 
 ```mermaid
 flowchart TD
     subgraph NewUser["👤 New User Registration"]
-        INIT["🆕 Initialize Trust<br/>α = 1.0, β = 1.0<br/>trust_score = 0.5"]
+        INIT["🆕 Initialize Trust<br/>trust_score = 0.5<br/>(Neutral Start)"]
     end
 
     subgraph ReportSubmission["📝 Report Submission"]
@@ -24,12 +24,12 @@ flowchart TD
         NEUTRAL["⚠️ Flagged<br/>(0.4 - 0.7)"]
     end
 
-    subgraph BayesianUpdate["🎲 Bayesian Update"]
-        UPDATE_ALPHA["α ← α + 1<br/>(Successful Report)"]
-        UPDATE_BETA["β ← β + 1<br/>(Failed Report)"]
-        NO_UPDATE["No Change<br/>(Inconclusive)"]
+    subgraph TrustUpdate["📊 Trust Update"]
+        UPDATE_UP["trust += 0.1<br/>(Validated Report)"]
+        UPDATE_DOWN["trust -= 0.15<br/>(Rejected Report)"]
+        NO_UPDATE["No Change<br/>(Flagged/Inconclusive)"]
         
-        CALC_TRUST["📊 Trust = α / (α + β)"]
+        CLAMP["Clamp(0.0, 1.0)"]
     end
 
     subgraph TrustScore["⭐ Updated Trust Score"]
@@ -52,15 +52,15 @@ flowchart TD
     OUTCOME -->|"Score < 0.4"| INCORRECT
     OUTCOME -->|"0.4 - 0.7"| NEUTRAL
     
-    CORRECT --> UPDATE_ALPHA
-    INCORRECT --> UPDATE_BETA
+    CORRECT --> UPDATE_UP
+    INCORRECT --> UPDATE_DOWN
     NEUTRAL --> NO_UPDATE
     
-    UPDATE_ALPHA --> CALC_TRUST
-    UPDATE_BETA --> CALC_TRUST
-    NO_UPDATE --> CALC_TRUST
+    UPDATE_UP --> CLAMP
+    UPDATE_DOWN --> CLAMP
+    NO_UPDATE --> CLAMP
     
-    CALC_TRUST --> NEW_SCORE
+    CLAMP --> NEW_SCORE
     NEW_SCORE --> SAVE
     
     SAVE --> INACTIVE
@@ -79,34 +79,35 @@ flowchart TD
     class INIT initNode
     class SUBMIT,LOOKUP submitNode
     class VALIDATE,OUTCOME validateNode
-    class CORRECT,UPDATE_ALPHA successNode
-    class INCORRECT,UPDATE_BETA failNode
+    class CORRECT,UPDATE_UP successNode
+    class INCORRECT,UPDATE_DOWN failNode
     class NEUTRAL,NO_UPDATE neutralNode
-    class CALC_TRUST,NEW_SCORE,SAVE bayesNode
+    class CLAMP,NEW_SCORE,SAVE bayesNode
     class INACTIVE,DECAY_CALC decayNode
 ```
 
 ## Mathematical Foundation
 
-### Beta Distribution Prior
+### Simplified Trust Scoring
 
-The trust system uses a **Beta-Binomial** model:
+The trust system uses **increment/decrement** scoring:
 
 $$
-\text{Trust}(u) = \frac{\alpha_u}{\alpha_u + \beta_u}
+\text{Trust}_{new} = \text{clamp}(\text{Trust}_{old} + \Delta, 0, 1)
 $$
 
 Where:
-- $\alpha_u$ = Number of validated reports + 1 (prior)
-- $\beta_u$ = Number of rejected reports + 1 (prior)
+- $\Delta = +0.1$ for validated reports
+- $\Delta = -0.15$ for rejected reports
+- $\Delta = 0$ for flagged reports
 
 ### Update Rules
 
-| Event | Update | Effect on Trust |
+| Event | Delta | Effect on Trust |
 |-------|--------|-----------------|
-| Report Validated | α ← α + 1 | Trust ↑ |
-| Report Rejected | β ← β + 1 | Trust ↓ |
-| Report Flagged | No change | Trust unchanged |
+| Report Validated | +0.10 | Trust ↑ |
+| Report Rejected | -0.15 | Trust ↓ |
+| Report Flagged | 0 | Trust unchanged |
 
 ### Trust Score Interpretation
 
@@ -144,24 +145,18 @@ flowchart LR
 ## Python Implementation
 
 ```python
-class BayesianTrust:
-    def __init__(self, alpha: float = 1.0, beta: float = 1.0):
-        self.alpha = alpha
-        self.beta = beta
+class SimpleTrust:
+    TRUST_INCREMENT = 0.1
+    TRUST_DECREMENT = 0.15
     
-    @property
-    def trust_score(self) -> float:
-        return self.alpha / (self.alpha + self.beta)
+    def __init__(self, score: float = 0.5):
+        self.trust_score = score
     
     def update(self, validated: bool) -> float:
         if validated:
-            self.alpha += 1
+            self.trust_score += self.TRUST_INCREMENT
         else:
-            self.beta += 1
+            self.trust_score -= self.TRUST_DECREMENT
+        self.trust_score = max(0.0, min(1.0, self.trust_score))
         return self.trust_score
-    
-    def decay(self, factor: float = 0.95):
-        """Apply time-based decay for inactive users."""
-        self.alpha *= factor
-        self.beta *= factor
 ```

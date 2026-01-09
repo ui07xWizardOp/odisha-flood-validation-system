@@ -14,13 +14,13 @@ flowchart TD
         DEM_CHECK["📊 DEM Lookup<br/>(Elevation at Point)"]
         HAND_CHECK["💧 HAND Index<br/>(Height Above Nearest Drainage)"]
         SLOPE_CHECK["📐 Slope Analysis<br/>(WhiteboxTools)"]
-        RF_MODEL["🌳 Random Forest<br/>(Trained on Mahanadi Basin)"]
+        RULE_MODEL["📊 Rule Scoring<br/>(HAND, Slope, Elevation)"]
         
-        DEM_CHECK --> RF_MODEL
-        HAND_CHECK --> RF_MODEL
-        SLOPE_CHECK --> RF_MODEL
+        DEM_CHECK --> RULE_MODEL
+        HAND_CHECK --> RULE_MODEL
+        SLOPE_CHECK --> RULE_MODEL
         
-        RF_MODEL --> L1_SCORE["Score: 0.0 - 1.0"]
+        RULE_MODEL --> L1_SCORE["Score: 0.0 - 1.0"]
     end
 
     subgraph Layer2["📊 Layer 2: Statistical Consistency"]
@@ -44,23 +44,23 @@ flowchart TD
     end
 
     subgraph Layer4["📰 Layer 4: Social Context"]
-        NEWS_API["📡 NewsAPI Query<br/>(Odisha + Flood + Location)"]
-        TWEET_SEARCH["🐦 Twitter Search<br/>(Matching Keywords)"]
+        NEWS_API["📡 NewsData.io<br/>(Odisha + Flood)"]
+        MOCK_FB["🔄 Mock Fallback<br/>(Testing Mode)"]
         CORROBORATION["✅ Corroboration Check<br/>(External Validation)"]
         
         NEWS_API --> CORROBORATION
-        TWEET_SEARCH --> CORROBORATION
+        MOCK_FB --> CORROBORATION
         CORROBORATION --> L4_SCORE["Score: 0.0 - 1.0"]
     end
 
     subgraph Layer5["📸 Layer 5: Computer Vision"]
         IMG_INPUT["🖼️ User Photo<br/>(JPEG/PNG)"]
-        CNN_MODEL["🧠 CNN Classifier<br/>(ResNet-50 Fine-tuned)"]
-        WATER_DETECT["💧 Water Detection<br/>(Segmentation Ratio)"]
+        HYBRID_MODEL["🧠 Hybrid Ensemble<br/>(MobileNetV2 + OpenCV)"]
+        EDGE_CASES["🔍 Edge Case Detection<br/>(Glare, Pools, Reflections)"]
         
-        IMG_INPUT --> CNN_MODEL
-        CNN_MODEL --> WATER_DETECT
-        WATER_DETECT --> L5_SCORE["Score: 0.0 - 1.0"]
+        IMG_INPUT --> HYBRID_MODEL
+        HYBRID_MODEL --> EDGE_CASES
+        EDGE_CASES --> L5_SCORE["Score: 0.0 - 1.0"]
     end
 
     subgraph Aggregation["⚖️ Weighted Aggregation"]
@@ -108,11 +108,11 @@ flowchart TD
     classDef outputBad fill:#ffcdd2,stroke:#c62828,stroke-width:3px
 
     class REPORT inputNode
-    class DEM_CHECK,HAND_CHECK,SLOPE_CHECK,RF_MODEL,L1_SCORE layer1
+    class DEM_CHECK,HAND_CHECK,SLOPE_CHECK,RULE_MODEL,L1_SCORE layer1
     class SPATIAL,DBSCAN_ALGO,CONSENSUS,L2_SCORE layer2
     class USER_HIST,BAYESIAN,TRUST,L3_SCORE layer3
-    class NEWS_API,TWEET_SEARCH,CORROBORATION,L4_SCORE layer4
-    class IMG_INPUT,CNN_MODEL,WATER_DETECT,L5_SCORE layer5
+    class NEWS_API,MOCK_FB,CORROBORATION,L4_SCORE layer4
+    class IMG_INPUT,HYBRID_MODEL,EDGE_CASES,L5_SCORE layer5
     class WEIGHT_NET,FINAL_CALC,THRESHOLD aggregateNode
     class VALIDATED outputGood
     class FLAGGED outputWarn

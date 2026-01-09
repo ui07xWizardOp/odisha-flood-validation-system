@@ -19,12 +19,10 @@ flowchart TD
 
     subgraph ML["🧠 src/ml/"]
         subgraph MLModels["models/"]
-            RF["random_forest.py"]
+            RULE["layer1_physical.py<br/>(Rule Scoring)"]
             DBSCAN_M["dbscan_clustering.py"]
             WEIGHT["weight_network.py"]
-            IMG_CLS["image_classifier.py"]
-            LGB["lightgbm_ensemble.py"]
-            XGB_M["xgboost_model.py"]
+            IMG_CLS["ensemble_classifier.py<br/>(Hybrid CV)"]
         end
         
         EVAL["evaluation.py<br/>(Metrics)"]
@@ -86,7 +84,7 @@ flowchart TD
     MODELS --> DATABASE
     
     %% Validator Dependencies
-    VALIDATOR --> RF
+    VALIDATOR --> RULE
     VALIDATOR --> DBSCAN_M
     VALIDATOR --> WEIGHT
     VALIDATOR --> IMG_CLS
@@ -94,10 +92,7 @@ flowchart TD
     VALIDATOR --> SPATIAL
     
     %% ML Model Dependencies
-    RF --> SKLEARN
-    DBSCAN_M --> SKLEARN
-    LGB --> SKLEARN
-    XGB_M --> SKLEARN
+    RULE --> SKLEARN
     IMG_CLS --> TORCH
     WEIGHT --> SKLEARN
     EVAL --> SKLEARN
@@ -135,7 +130,7 @@ flowchart TD
 
     class MAIN,MODELS,SCHEMAS,DATABASE apiNode
     class VALIDATOR validNode
-    class RF,DBSCAN_M,WEIGHT,IMG_CLS,LGB,XGB_M,EVAL mlNode
+    class RULE,DBSCAN_M,WEIGHT,IMG_CLS,EVAL mlNode
     class RASTER,SPATIAL preNode
     class GEO,LOGGER,CONFIG utilNode
     class FASTAPI_DEP,SQLALCHEMY,GEOALCHEMY,RASTERIO,SKLEARN,TORCH,KAFKA extNode
@@ -147,7 +142,7 @@ flowchart TD
 ```mermaid
 flowchart LR
     MAIN["main.py"] --> VALIDATOR["validator.py"]
-    VALIDATOR --> RF["random_forest.py"]
+    VALIDATOR --> RULE["layer1_physical.py"]
     VALIDATOR --> DBSCAN["dbscan_clustering.py"]
     VALIDATOR --> WEIGHT["weight_network.py"]
     VALIDATOR --> IMGCLS["image_classifier.py"]
@@ -172,12 +167,10 @@ src/
 │   └── database.py       # Database connection
 ├── ml/
 │   ├── models/
-│   │   ├── random_forest.py      # Physical plausibility
+│   │   ├── layer1_physical.py       # Rule-based scoring
 │   │   ├── dbscan_clustering.py  # Spatial analysis
 │   │   ├── weight_network.py     # Adaptive weighting
-│   │   ├── image_classifier.py   # CNN flood detection
-│   │   ├── lightgbm_ensemble.py  # Gradient boosting
-│   │   └── xgboost_model.py      # Alternative ensemble
+│   │   └── ensemble_classifier.py   # Hybrid CNN+OpenCV
 │   ├── training/
 │   │   └── train_models.py
 │   └── evaluation.py

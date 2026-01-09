@@ -50,9 +50,7 @@ flowchart TD
         subgraph CoreML["Core ML Libraries"]
             ML1["scikit-learn 1.4<br/>(RF, DBSCAN)"]
             ML2["PyTorch 2.1<br/>(CNN)"]
-            ML3["torchvision 0.16<br/>(ResNet-50)"]
-            ML4["LightGBM 4.2<br/>(Gradient Boosting)"]
-            ML5["XGBoost 2.0<br/>(Ensemble)"]
+            ML3["torchvision 0.16<br/>(MobileNetV2)"]
         end
         
         subgraph MLSupport["ML Support"]
@@ -87,12 +85,11 @@ flowchart TD
 
     subgraph ExternalAPIs["🌐 External APIs"]
         EA1["Google Maps Platform<br/>(Geocoding)"]
-        EA2["Twitter API v2<br/>(Social Ingestion)"]
-        EA3["NewsAPI.org<br/>(News Corroboration)"]
-        EA4["IMD API<br/>(Weather Data)"]
+        EA2["NewsData.io<br/>(News Corroboration)"]
+        EA3["Open-Meteo<br/>(Weather Data)"]
+        EA4["IMD API<br/>(Rainfall Data)"]
         EA5["ISRO Bhuvan<br/>(Satellite)"]
-        EA6["Twilio<br/>(SMS)"]
-        EA7["Firebase FCM<br/>(Push Notifications)"]
+        EA6["Firebase FCM<br/>(Push Notifications)"]
     end
 
     subgraph DevOps["🐳 DevOps Layer"]
@@ -144,7 +141,7 @@ flowchart TD
     class GE1,GE2,GE3,GE4,GE5,GE6 geoNode
     class DB1,DB2,DB3,DB4 dbNode
     class CS1,CS2 cloudNode
-    class EA1,EA2,EA3,EA4,EA5,EA6,EA7 extNode
+    class EA1,EA2,EA3,EA4,EA5,EA6 extNode
     class DO1,DO2,DO3,DO4,DO5,DO6 devNode
 ```
 

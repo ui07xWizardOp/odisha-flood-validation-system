@@ -23,9 +23,9 @@ flowchart TD
         VALIDATION["🤖 5-Layer Validation Engine"]
         
         subgraph MLModels["🧠 ML Models"]
-            RF["Random Forest<br/>(Physical Plausibility)"]
+            RULE["Rule-based Scoring<br/>(Physical Plausibility)"]
             DBSCAN["DBSCAN<br/>(Spatial Clustering)"]
-            IMGCLS["Image Classifier<br/>(Flood Detection)"]
+            IMGCLS["Hybrid Ensemble<br/>(CNN + OpenCV)"]
             WEIGHT["Weight Network<br/>(Adaptive Learning)"]
         end
     end
@@ -37,12 +37,10 @@ flowchart TD
     end
 
     subgraph ExternalAPIs["🌐 External APIs"]
-        TWITTER["🐦 Twitter API<br/>(Social Ingestion)"]
+        NEWSDATA["📰 NewsData.io<br/>(Social Context)"]
         BHUVAN["🛰️ ISRO Bhuvan<br/>(Satellite Data)"]
-        GMAPS["📍 Google Maps<br/>(Geocoding)"]
-        IMD["🌧️ IMD Weather<br/>(Rainfall Data)"]
-        TWILIO["📞 Twilio<br/>(SMS Alerts)"]
-        VISION["👁️ Google Vision<br/>(Image Analysis)"]
+        OPENMETEO["🌧️ Open-Meteo<br/>(Weather Data)"]
+        LEAFLET["📍 Leaflet/OSM<br/>(Mapping)"]
     end
 
     subgraph GeoData["🗺️ Geospatial Data"]
@@ -67,15 +65,15 @@ flowchart TD
     TWITTER --> KAFKA
 
     %% Validation Engine
-    VALIDATION --> RF
+    VALIDATION --> RULE
     VALIDATION --> DBSCAN
     VALIDATION --> IMGCLS
     VALIDATION --> WEIGHT
     
     %% ML to Geo Data
-    RF --> DEM
-    RF --> HAND
-    RF --> SLOPE
+    RULE --> DEM
+    RULE --> HAND
+    RULE --> SLOPE
 
     %% Storage Connections
     FASTAPI --> POSTGIS
@@ -84,10 +82,8 @@ flowchart TD
     VALIDATION --> POSTGIS
 
     %% External API Connections
-    FASTAPI --> GMAPS
-    FASTAPI --> IMD
-    FASTAPI --> TWILIO
-    FASTAPI --> VISION
+    FASTAPI --> OPENMETEO
+    FASTAPI --> NEWSDATA
     FASTAPI --> BHUVAN
 
     %% Styling
@@ -102,7 +98,7 @@ flowchart TD
     class FASTAPI,CORS,AUTH apiNode
     class RF,DBSCAN,IMGCLS,WEIGHT,VALIDATION,KAFKA mlNode
     class POSTGIS,S3,REDIS dataNode
-    class TWITTER,BHUVAN,GMAPS,IMD,TWILIO,VISION extNode
+    class NEWSDATA,BHUVAN,OPENMETEO,LEAFLET extNode
     class DEM,HAND,SLOPE geoNode
 ```
 
@@ -113,6 +109,6 @@ flowchart TD
 | User Interface | React, React Native | Web dashboard and mobile app |
 | API Gateway | FastAPI + Uvicorn | RESTful API with async support |
 | Processing | Kafka, Python | Real-time event streaming |
-| Validation | Random Forest, DBSCAN | Multi-layer ML validation |
+| Validation | Rule-based, DBSCAN | Multi-layer ML validation |
 | Storage | PostGIS, S3, Redis | Geospatial, media, and cache |
 | External | Twitter, IMD, ISRO | Data augmentation services |

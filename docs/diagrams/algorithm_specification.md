@@ -6,11 +6,11 @@
 
 The validation algorithm assesses crowdsourced flood reports through **five complementary ML-enhanced layers**:
 
-1. **Physical Plausibility (Layer 1)** - DEM-based terrain analysis with Random Forest
-2. **Statistical Consistency (Layer 2)** - DBSCAN clustering + XGBoost consensus
-3. **Reputation System (Layer 3)** - Bayesian user trust scoring
-4. **Social Context (Layer 4)** - News API flood event correlation
-5. **Visual Verification (Layer 5)** - Computer vision flood detection (optional)
+1. **Physical Plausibility (Layer 1)** - DEM-based terrain analysis with rule-based scoring
+2. **Statistical Consistency (Layer 2)** - DBSCAN clustering + Hybrid consensus
+3. **Reputation System (Layer 3)** - Trust increment/decrement scoring (+0.1/-0.15)
+4. **Social Context (Layer 4)** - NewsData.io flood event correlation
+5. **Visual Verification (Layer 5)** - Hybrid Ensemble (MobileNetV2 + OpenCV)
 
 **Weight Aggregation:** A neural network learns optimal layer weights instead of fixed values.
 
@@ -29,10 +29,10 @@ Determine if flooding is physically possible at the reported location based on t
 | Slope | Computed | Terrain steepness (degrees) |
 | Neighborhood Stats | DEM | Local elevation mean/std |
 
-### ML Enhancement: Random Forest Classifier
-- Trained on `data/ml_training/physical_features.csv`
-- Model: `models/rf_physical_plausibility.pkl`
-- Falls back to rule-based scoring if model unavailable
+### ML Enhancement: Rule-based Scoring
+- Primary: Rule-based thresholds (HAND < 10m, Slope < 15°)
+- Fallback: Trained Random Forest if model available
+- Model: `models/rf_physical_plausibility.pkl` (optional)
 
 ### Scoring Logic (Rule-Based Fallback)
 
@@ -72,13 +72,13 @@ Check if the report is consistent with other nearby reports using spatial cluste
    - Parameters: `eps=0.01` (~1km), `min_samples=3`
    - Score based on cluster membership
 
-2. **XGBoost Consensus** (`models/xgb_statistical_consensus.json`)
-   - Features: `neighbor_count`, `median_neighbor_depth`, `rainfall_24h/48h`, `user_trust_score`
-   - Trained on `data/ml_training/statistical_features.csv`
+2. **Hybrid Scoring**
+   - Combines DBSCAN cluster membership with rule-based checks
+   - Considers neighbor count, rainfall correlation
 
 ### Combined Scoring
 ```
-L2_score = 0.6 × DBSCAN_score + 0.4 × rule_based_score
+L2_score = statistical_validator.validate(lat, lon, depth, timestamp, recent_reports, rainfall)
 ```
 
 ### Temporal Consistency (Rule-Based Component)
@@ -97,11 +97,11 @@ else:                    score = 0.2  (No rain = suspicious)
 ### Purpose
 Weight validation by user historical accuracy using Bayesian trust.
 
-### Trust Score Management
+### Trust Score Management (SimpleTrust)
 - Initial trust: 0.5
-- After verified report: trust += 0.1
-- After flagged report: trust -= 0.15
-- Range: [0.0, 1.0]
+- After validated report: trust += 0.1
+- After flagged/rejected report: trust -= 0.15
+- Range: clamped to [0.0, 1.0]
 
 ### Layer 3 Score
 ```
@@ -116,8 +116,8 @@ L3_score = user_trust_score
 Correlate reports with external news and social media signals.
 
 ### Data Sources
-- News API (flood-related headlines)
-- Social service aggregation
+- NewsData.io API (flood-related headlines)
+- Mock fallback for testing
 
 ### Scoring
 ```
@@ -133,8 +133,13 @@ else:                          score = 0.3
 ### Purpose
 Validate flood photos using computer vision.
 
-### ML Model: MobileNetV2-based Classifier
-- Location: `src/ml/models/image_classifier.py`
+### ML Model: Hybrid Ensemble Classifier
+- Location: `src/ml/models/ensemble_classifier.py`
+- Components:
+  - MobileNetV2 CNN (45% weight)
+  - HSV Water Detection - OpenCV (30% weight)
+  - Texture Analysis - Laplacian variance (15% weight)
+  - Edge Case Detection (glare, pools, reflections)
 - Outputs: `is_flood_detected`, `confidence`, `water_coverage`
 
 ### Scoring

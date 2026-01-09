@@ -40,13 +40,13 @@ Email: \{author1, author2, author3\}@university.edu}
 \begin{abstract}
 Crowdsourced flood reports provide critical real-time ground truth during disasters but suffer from GPS errors, user mistakes, and potential false positives, limiting their reliability for emergency response. Existing validation approaches are either rule-based (inflexible) or pure machine learning (black-box, physically unconstrained), failing to achieve both accuracy and interpretability.
 
-We present a novel five-layer ML-enhanced validation framework that integrates: (1) Physical plausibility using DEM, HAND, and slope constraints with Random Forest; (2) Statistical consistency via DBSCAN spatial clustering; (3) User reputation through Bayesian trust scoring; (4) Social context from news corroboration; and (5) Computer vision flood detection using MobileNetV2.
+We present a novel five-layer ML-enhanced validation framework that integrates: (1) Physical plausibility using DEM, HAND, and slope constraints with rule-based scoring; (2) Statistical consistency via hybrid DBSCAN spatial clustering; (3) User reputation through trust scoring; (4) Social context from news corroboration; and (5) Computer vision flood detection using a hybrid ensemble.
 
 Evaluated on the Mahanadi Delta, Odisha---one of India's most flood-prone regions---our system achieves F1 scores of 1.0 at 5-15\% noise levels and 0.985 at 30\% noise, outperforming DEM-only baselines by up to 15.9 percentage points. The system processes reports in under 3 seconds, enabling real-time deployment. Our ablation study confirms that physical plausibility contributes 39.4\% of discriminative power, validating the importance of terrain constraints.
 \end{abstract}
 
 \begin{IEEEkeywords}
-flood validation, crowdsourcing, DEM, HAND, Random Forest, DBSCAN, Bayesian trust, disaster management, machine learning
+flood validation, crowdsourcing, DEM, HAND, DBSCAN, trust scoring, disaster management, computer vision
 \end{IEEEkeywords}
 
 % =============================================================================
@@ -71,7 +71,7 @@ Existing validation approaches are either \textit{rule-based} (fixed thresholds 
 We make the following contributions:
 \begin{enumerate}
     \item \textbf{Novel 5-Layer Framework}: First hybrid physics-ML validation pipeline combining DEM constraints with modern machine learning
-    \item \textbf{DEM-Constrained ML}: Integration of HAND index and slope analysis with Random Forest, preventing physically impossible predictions
+    \item \textbf{DEM-Constrained Scoring}: Integration of HAND index and slope analysis with rule-based thresholds, preventing physically impossible predictions
     \item \textbf{Adaptive Weight Learning}: Optimization of layer contributions from ground truth data
     \item \textbf{Real-Time API}: Production-grade FastAPI backend with $<$200ms response time
     \item \textbf{Open-Source Release}: Full code, synthetic data generators, and Docker deployment
@@ -134,6 +134,21 @@ Crowdsourced & Synthetic & Point data \\
 \end{tabular}
 \end{table}
 
+\subsection{System Architecture}
+Figure~\ref{fig:arch} illustrates the complete 5-layer validation pipeline, from user submission via the ``Magic Upload'' interface to final database storage.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.48\textwidth]{figures/system_architecture.png}
+\caption{System Architecture: Reports are processed through EXIF extraction before entering the 5-layer parallel validation engine. A weight learning network aggregates scores to produce the final verdict.}
+\label{fig:arch}
+\end{figure}
+
+
+
+\subsubsection{Geotagged Photo Pipeline}
+To minimize user input errors, the system automatically extracts GPS coordinates and timestamps from uploaded photo EXIF metadata. This enables ``zero-click'' reporting where users simply upload a smartphone photo to the \texttt{/reports/from-image} endpoint. The service validates coordinates against Odisha state bounds (17.5°N--22.5°N) and filters out images older than 2 hours.
+
 \subsection{Five-Layer Validation Algorithm}
 
 Our system validates each flood report through five complementary layers, each producing a score $S_i \in [0, 1]$.
@@ -143,13 +158,13 @@ We verify that the reported location is physically capable of flooding using ter
 
 \textbf{Features}: Elevation ($e$), HAND ($h$), Slope ($s$), Neighborhood mean ($\bar{e}$), Gradient ($\nabla e$), Reported depth ($d$), Hour ($t$).
 
-\textbf{Model}: Random Forest classifier (100 estimators, max\_depth=15) trained on 5,000 Mahanadi Basin points.
+\textbf{Model}: Rule-based scoring utilizing HAND, Slope, and Neighborhood Elevation thresholds.
 
 \textbf{Physical Constraint}:
 \begin{equation}
 S_1 = \begin{cases}
 0 & \text{if } h > 15m \land s > 20° \\
-\text{RF}(e, h, s, \bar{e}, \nabla e, d, t) & \text{otherwise}
+\text{RuleScore}(e, h, s, \bar{e}) & \text{otherwise}
 \end{cases}
 \end{equation}
 
@@ -180,7 +195,7 @@ S_3 = \frac{\alpha}{\alpha + \beta}
 \subsubsection{Layer 4: Social Context (Weight: 0.10)}
 We check if external news sources corroborate flooding:
 
-\textbf{Sources}: NewsAPI.org, Twitter API v2.
+\textbf{Sources}: NewsData.io (free tier) with mock fallback for consistent testing.
 
 \begin{equation}
 S_4 = \begin{cases}
@@ -193,7 +208,9 @@ S_4 = \begin{cases}
 \subsubsection{Layer 5: Computer Vision (Weight: 0.10)}
 We verify that attached photos show actual flooding:
 
-\textbf{Model}: MobileNetV2 (fine-tuned on FloodNet dataset, 2,343 images). We chose MobileNetV2 over ResNet-50 for faster CPU inference in resource-constrained deployments.
+\textbf{Model}: Hybrid Ensemble combining (1) MobileNetV2 CNN (45\% weight), (2) HSV water detection (30\%), (3) Texture variance (15\%), and (4) NDWI proxy (10\%).
+
+\textbf{Edge Cases}: Includes specialized detectors for glare, vertical reflections (wet roads), and geometric regularity (pools).
 
 \begin{equation}
 S_5 = P(\text{flood} \mid \text{image})
@@ -368,7 +385,7 @@ The system meets the $<$3 second target for real-time deployment. Figure~\ref{fi
     \item \textit{L3 Simplified}: Reputation layer uses incremental scoring rather than full Bayesian updates
     \item \textit{L4 Incomplete}: Social layer at 60\% implementation due to API rate limits
     \item \textit{L5 CPU-Only}: 400ms latency; GPU would improve performance
-    \item \textit{District-Level Accuracy}: Severity prediction achieves 57.7\% (15/26 districts), indicating room for improvement in aggregated predictions
+    \item \textit{District-Level Accuracy}: Severity prediction achieves 46.1\% (12/26 districts), indicating room for improvement in aggregated predictions
 \end{itemize}
 
 \textbf{Deployment Limitations}:
@@ -389,7 +406,7 @@ The system meets the $<$3 second target for real-time deployment. Figure~\ref{fi
 \section{Conclusion}
 \label{sec:conclusion}
 
-We presented a novel five-layer ML-enhanced framework for validating crowdsourced flood reports, combining physical plausibility constraints (DEM, HAND, slope), statistical consistency (DBSCAN), user reputation (Bayesian trust), social context (news corroboration), and computer vision (MobileNetV2).
+We presented a novel five-layer ML-enhanced framework for validating crowdsourced flood reports, combining physical plausibility constraints (DEM, HAND, slope), statistical consistency (hybrid DBSCAN), user reputation (trust scoring), social context (news corroboration), and computer vision (hybrid ensemble).
 
 Evaluated on the Mahanadi Delta---one of the world's most flood-vulnerable regions---our system achieves F1 scores of 1.0 at 5--15\% noise and 0.985 at 30\% noise, outperforming DEM-only baselines by up to 15.9 percentage points. The system processes reports in under 3 seconds, enabling real-time deployment during disaster response.
 

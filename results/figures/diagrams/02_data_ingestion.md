@@ -7,11 +7,10 @@ This diagram illustrates the streaming architecture for ingesting crowdsourced f
 ```mermaid
 flowchart LR
     subgraph Sources["📥 Data Sources"]
-        TWITTER["🐦 Twitter API<br/>(v2 Streaming)"]
-        FB["📘 Facebook API<br/>(Webhooks)"]
+        NEWSDATA["📰 NewsData.io<br/>(News Context)"]
         APP["📱 Mobile App<br/>(Direct Submit)"]
         WEB["🖥️ Web Portal<br/>(Form Submit)"]
-        SMS["📞 SMS Gateway<br/>(Twilio Webhook)"]
+        EXIF["📷 EXIF Upload<br/>(Magic Photo)"]
     end
 
     subgraph Ingestion["📡 Kafka Ingestion Layer"]
@@ -27,7 +26,7 @@ flowchart LR
     end
 
     subgraph Preprocessing["⚙️ Preprocessing Pipeline"]
-        GEOCODE["📍 Geocoding Service<br/>(Google Maps API)"]
+        GEOCODE["📍 EXIF GPS Extraction<br/>(Pillow PIL)"]
         NLP["📝 NLP Extraction<br/>(spaCy/Transformers)"]
         NORMALIZE["🔄 Data Normalization<br/>(Schema Validation)"]
         DEDUPE["🧹 Deduplication<br/>(Fuzzy Matching)"]
@@ -45,11 +44,10 @@ flowchart LR
     end
 
     %% Source to Kafka
-    TWITTER --> TOPIC_SOCIAL
-    FB --> TOPIC_SOCIAL
+    NEWSDATA --> TOPIC_SOCIAL
+    EXIF --> TOPIC_RAW
     APP --> TOPIC_RAW
     WEB --> TOPIC_RAW
-    SMS --> TOPIC_RAW
 
     %% Kafka to Consumers
     TOPIC_RAW --> CONSUMER1
@@ -85,7 +83,7 @@ flowchart LR
     classDef storageNode fill:#ffe0b2,stroke:#ef6c00,stroke-width:2px
     classDef validNode fill:#ffcdd2,stroke:#c62828,stroke-width:2px
 
-    class TWITTER,FB,APP,WEB,SMS sourceNode
+    class NEWSDATA,EXIF,APP,WEB sourceNode
     class TOPIC_RAW,TOPIC_SOCIAL,TOPIC_VERIFIED kafkaNode
     class CONSUMER1,CONSUMER2,CONSUMER3 consumerNode
     class GEOCODE,NLP,NORMALIZE,DEDUPE processNode
@@ -99,7 +97,7 @@ flowchart LR
 |-------|-----------|------------|------------|
 | **1. Ingestion** | Kafka Topics | Apache Kafka | 10K msgs/sec |
 | **2. Consumption** | Consumer Groups | Python + kafka-python | Parallel processing |
-| **3. Geocoding** | Location Resolution | Google Maps API | 50 req/sec |
+| **3. Geocoding** | Location Resolution | EXIF Extraction + Pillow | Real-time |
 | **4. NLP** | Text Extraction | spaCy + Transformers | Batch processing |
 | **5. Normalization** | Schema Validation | Pydantic | Real-time |
 | **6. Deduplication** | Fuzzy Matching | RapidFuzz | Near-duplicate removal |

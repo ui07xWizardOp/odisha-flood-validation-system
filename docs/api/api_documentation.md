@@ -227,11 +227,11 @@ Reports are validated using a **5-layer ML-enhanced algorithm**:
 
 | Layer | Component | Description |
 |-------|-----------|-------------|
-| L1 | Physical | Random Forest on DEM, HAND, Slope features |
-| L2 | Statistical | DBSCAN clustering + XGBoost consensus |
-| L3 | Reputation | Bayesian trust scoring |
-| L4 | Social | News API flood event correlation |
-| L5 | Visual | Computer vision flood detection (optional) |
+| L1 | Physical | Rule-based scoring on DEM, HAND, Slope features |
+| L2 | Statistical | DBSCAN clustering + Hybrid consensus |
+| L3 | Reputation | Trust increment/decrement (+0.1/-0.15) |
+| L4 | Social | NewsData.io flood event correlation |
+| L5 | Visual | Hybrid Ensemble (MobileNetV2 + OpenCV) |
 
 **Weight Aggregation:** Neural network learns optimal weights instead of fixed values.
 

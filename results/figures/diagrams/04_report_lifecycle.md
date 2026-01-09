@@ -32,8 +32,8 @@ stateDiagram-v2
             [*] --> DEMLookup
             DEMLookup --> HANDCheck
             HANDCheck --> SlopeAnalysis
-            SlopeAnalysis --> RFInference
-            RFInference --> [*]
+            SlopeAnalysis --> RuleScoring
+            RuleScoring --> [*]
         }
         
         Layer1Processing --> Layer2Processing: L1 Score Complete
@@ -49,17 +49,17 @@ stateDiagram-v2
         
         state Layer3Processing {
             [*] --> UserHistoryLookup
-            UserHistoryLookup --> BayesianUpdate
-            BayesianUpdate --> TrustScoreCalc
+            UserHistoryLookup --> TrustUpdate
+            TrustUpdate --> TrustScoreCalc
             TrustScoreCalc --> [*]
         }
         
         Layer3Processing --> Layer4Processing: L3 Score Complete
         
         state Layer4Processing {
-            [*] --> NewsAPIQuery
-            NewsAPIQuery --> TwitterSearch
-            TwitterSearch --> CorroborationScore
+            [*] --> NewsDataQuery
+            NewsDataQuery --> MockFallback
+            MockFallback --> CorroborationScore
             CorroborationScore --> [*]
         }
         
@@ -67,10 +67,10 @@ stateDiagram-v2
         
         state Layer5Processing {
             [*] --> ImageDownload
-            ImageDownload --> CNNPreprocess
-            CNNPreprocess --> ModelInference
-            ModelInference --> WaterSegmentation
-            WaterSegmentation --> [*]
+            ImageDownload --> HybridPreprocess
+            HybridPreprocess --> EnsembleInference
+            EnsembleInference --> EdgeCaseDetection
+            EdgeCaseDetection --> [*]
         }
         
         Layer5Processing --> Aggregation: All Layers Complete

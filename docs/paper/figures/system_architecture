@@ -1,0 +1,52 @@
+// System Architecture
+digraph {
+	dpi=300 rankdir=TB size="10,10"
+	node [fillcolor=white fontname=Helvetica shape=box style="rounded,filled"]
+	edge [fontname=Helvetica fontsize=10]
+	subgraph cluster_0 {
+		color=lightgrey label="User Layer" style=filled
+		User [label="User / Citizen" fillcolor="#e1f5fe" shape=ellipse]
+		App [label="Web/Mobile App" fillcolor="#b3e5fc"]
+		Social [label="Social Media
+(Twitter/Telegram)" fillcolor="#b3e5fc"]
+	}
+	subgraph cluster_1 {
+		color="#fff9c4" label="Validation Server (FastAPI)" style=filled
+		EXIF [label="EXIF Service
+(GPS/Time Extraction)" fillcolor="#fff59d"]
+		Feature [label="Feature Extractor
+(DEM/Slope/HAND)" fillcolor="#fff59d"]
+		L1 [label="L1: Physical
+(Rule Check)" fillcolor="#ffcc80"]
+		L2 [label="L2: Statistical
+(Hybrid DBSCAN)" fillcolor="#ffcc80"]
+		L3 [label="L3: Reputation
+(Trust Score)" fillcolor="#ffcc80"]
+		L4 [label="L4: Social
+(NewsData.io)" fillcolor="#ffcc80"]
+		L5 [label="L5: Visual
+(Hybrid CNN+OpenCV)" fillcolor="#ffcc80"]
+		Agg [label="Weight Learning Network
+Sum(w * S)" fillcolor="#ffab91"]
+	}
+	DB [label="Database
+(Validated Reports)" fillcolor="#c8e6c9" shape=cylinder]
+	Das [label="Dashboard / Map" fillcolor="#c8e6c9"]
+	User -> App
+	User -> Social
+	App -> EXIF [label="Upload Photo"]
+	App -> Feature [label="Manual Report"]
+	Social -> L4 [label="Buzz Monitoring"]
+	EXIF -> Feature [label=Coords]
+	EXIF -> L5 [label="Image Data"]
+	Feature -> L1
+	Feature -> L2
+	Feature -> L3
+	L1 -> Agg
+	L2 -> Agg
+	L3 -> Agg
+	L4 -> Agg
+	L5 -> Agg
+	Agg -> DB [label="Score > 0.7"]
+	DB -> Das
+}

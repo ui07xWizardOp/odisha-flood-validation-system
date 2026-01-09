@@ -16,11 +16,11 @@ flowchart TD
     end
 
     subgraph FeatureExtraction["⚙️ Layer Score Extraction"]
-        L1_FEAT["Layer 1: Physical<br/>(RF Score)"]
+        L1_FEAT["Layer 1: Physical<br/>(Rule Score)"]
         L2_FEAT["Layer 2: Statistical<br/>(DBSCAN Score)"]
         L3_FEAT["Layer 3: Reputation<br/>(Trust Score)"]
         L4_FEAT["Layer 4: Social<br/>(News Score)"]
-        L5_FEAT["Layer 5: Vision<br/>(CNN Score)"]
+        L5_FEAT["Layer 5: Vision<br/>(Hybrid Ensemble)"]
         
         FEATURE_VEC["Feature Vector<br/>[s1, s2, s3, s4, s5]"]
         
